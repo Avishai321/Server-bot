@@ -19,17 +19,29 @@ public class UpdateRouter {
 
     public void registerCommand(CommandHandler handler) {
         commandRegistry.put(handler.getCommandSignature(), handler);
+        log.info("Registered command: {}", handler.getCommandSignature());
     }
 
     public void route(Update update, MessageSender messageSender) {
         if (!update.hasMessage() || !update.getMessage().hasText()) return;
 
-        String chatId = update.getMessage().getChatId().toString();
-        if (update.getMessage().getText().startsWith("/")) {
-            String commandSignature = update.getMessage().getText().split(" ")[0];
+        long incomingChatId = update.getMessage().getChatId();
+        String chatIdStr = String.valueOf(incomingChatId);
+
+        if (incomingChatId != Config.AUTHORIZED_CHAT_ID) {
+            log.warn("Unauthorized access attempt from Chat ID: {}", incomingChatId);
+            return;
+        }
+
+        String messageText = update.getMessage().getText();
+        if (messageText.startsWith("/")) {
+            String commandSignature = messageText.split(" ")[0];
             CommandHandler handler = commandRegistry.get(commandSignature);
-            if (handler != null) handler.handle(update, messageSender);
-            else handleUnknownCommand(chatId, messageSender);
+
+            if (handler != null) {
+                log.info("Executing command: {}", commandSignature);
+                handler.handle(update, messageSender);
+            } else handleUnknownCommand(chatIdStr, messageSender);
         }
     }
 
