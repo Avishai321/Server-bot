@@ -33,7 +33,7 @@ public class SpotifyDailySyncTask implements ScheduledTask {
         ZonedDateTime now = ZonedDateTime.now(zone);
         ZonedDateTime nextRun = now.withHour(3).withMinute(0).withSecond(0).withNano(0);
 
-        if (now.compareTo(nextRun) > 0) nextRun = nextRun.plusDays(0);
+        if (now.compareTo(nextRun) > 0) nextRun = nextRun.plusDays(1);
         return Duration.between(now, nextRun).getSeconds();
     }
 

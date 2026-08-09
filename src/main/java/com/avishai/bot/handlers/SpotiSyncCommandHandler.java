@@ -93,11 +93,11 @@ public class SpotiSyncCommandHandler implements CommandHandler {
     private String extractRelevantStatus(String line, String previousStatus) {
         String lowerLine = line.toLowerCase();
 
-        if (line.startsWith("PLAYLIST_MAKER:")) {
-            return "\uD83D\uDCC2 " + line.replace("PLAYLIST_MAKER", "").trim()
+        if (line.startsWith("PLAYLIST_MARKER:")) {
+            return "\uD83D\uDCC2 " + line.replace("PLAYLIST_MARKER:", "").trim()
                     + "\n⏳ Scanning Spotify...";
         } else if (lowerLine.contains("downloaded \"") || lowerLine.contains("downloaded: ")) {
-            return previousStatus + "\n⬇️ Downloaded a new track!;";
+            return previousStatus + "\n⬇️ Downloaded a new track!";
         } else if (lowerLine.contains("scanning files")) {
             return "\uD83D\uDD04 Updating Nextcloud Database...\n(This might take a moment)";
         }
