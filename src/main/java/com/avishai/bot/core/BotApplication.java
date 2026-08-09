@@ -1,6 +1,7 @@
 package com.avishai.bot.core;
 
-import com.avishai.bot.handlers.SpotiSyncCommandHandler;
+import com.avishai.bot.handlers.commands.SpotiSyncHandler;
+import com.avishai.bot.handlers.commands.StopSpotiSyncHandler;
 import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.scheduler.tasks.SpotifyDailySyncTask;
 import org.slf4j.Logger;
@@ -18,8 +19,11 @@ public class BotApplication {
         CoreBot bot = new CoreBot(Config.BOT_USERNAME, Config.BOT_TOKEN);
         bot.setUpdateRouter(router);
 
-        SpotiSyncCommandHandler spotiSyncHandler = new SpotiSyncCommandHandler();
+        SpotiSyncHandler spotiSyncHandler = new SpotiSyncHandler();
+        StopSpotiSyncHandler stopSpotiSyncHandler = new StopSpotiSyncHandler(spotiSyncHandler);
+
         router.registerCommand(spotiSyncHandler);
+        router.registerCommand(stopSpotiSyncHandler);
 
         TaskScheduler scheduler = new TaskScheduler();
         scheduler.registerTask(new SpotifyDailySyncTask(spotiSyncHandler, bot));
