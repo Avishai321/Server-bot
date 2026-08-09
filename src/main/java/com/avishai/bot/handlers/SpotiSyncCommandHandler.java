@@ -11,11 +11,12 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class SpotifyBackupCommandHandler implements CommandHandler {
-    private static final Logger log = LoggerFactory.getLogger(SpotifyBackupCommandHandler.class);
+public class SpotiSyncCommandHandler implements CommandHandler {
+    private static final Logger log = LoggerFactory.getLogger(SpotiSyncCommandHandler.class);
     private final ExecutorService executorService = Executors.newCachedThreadPool();
-    private static final long TELEGRAM_UPDATE_INTERVAL_MS = 3000;
+    private final AtomicBoolean isSyncing = new AtomicBoolean(false);
 
     @Override
     public String getCommandSignature() {
@@ -25,6 +26,14 @@ public class SpotifyBackupCommandHandler implements CommandHandler {
     @Override
     public void handle(Update update, MessageSender messageSender) {
         String chatId = update.getMessage().getChatId().toString();
+
+        if (!isSyncing.compareAndSet(false, true)) {
+            messageSender.sendMessage(
+                    chatId,
+                    "⚠️ A sync is already in progress. Please wait until it finishes!");
+            return;
+        }
+
         Integer messageId = messageSender.sendMessage(
                 chatId,
                 "Spotify Sync Initializing... \n[Processing...]"
@@ -43,7 +52,6 @@ public class SpotifyBackupCommandHandler implements CommandHandler {
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(Config.SPOTIFY_BACKUP_SCRIPT_PATH);
             processBuilder.redirectErrorStream(true);
-
             process = processBuilder.start();
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -56,7 +64,7 @@ public class SpotifyBackupCommandHandler implements CommandHandler {
                     latestStatus = extractRelevantStatus(line, latestStatus);
 
                     long currentTime = System.currentTimeMillis();
-                    if (currentTime - lastUpdateTime > TELEGRAM_UPDATE_INTERVAL_MS) {
+                    if (currentTime - lastUpdateTime > Config.TELEGRAM_UPDATE_INTERVAL_MS) {
                         messageSender.editMessage(chatId,
                                 messageId,
                                 "\uD83C\uDFA7 Spotify Sync in Progress:\n" + latestStatus
@@ -67,10 +75,11 @@ public class SpotifyBackupCommandHandler implements CommandHandler {
             }
 
             int exitCode = process.waitFor();
-            if (exitCode == 0) {messageSender.editMessage(
-                    chatId,
-                    messageId,
-                    "✅ Spotify Sync Completed Successfully!");
+            if (exitCode == 0) {
+                messageSender.editMessage(
+                        chatId,
+                        messageId,
+                        "✅ Spotify Sync Completed Successfully!");
             } else messageSender.editMessage(
                     chatId,
                     messageId,
@@ -81,18 +90,23 @@ public class SpotifyBackupCommandHandler implements CommandHandler {
                     messageId,
                     "⚠️ Critical Error during execution:\n" + e.getMessage());
         } finally {
+            isSyncing.set(false);
             if (process != null) process.destroy();
         }
     }
 
     private String extractRelevantStatus(String line, String previousStatus) {
-        if (line.toLowerCase().contains("processing playlist")) {
-            return "⏳" + line.trim();
-        } else if (line.toLowerCase().contains("downloaded")) {
-            return "⬇️" + line.trim();
-        } else if (line.toLowerCase().contains("scanning files")) {
-            return "\uD83D\uDD04 Updating Nextcloud Database";
+        String lowerLine = line.toLowerCase();
+
+        if (line.startsWith("PLAYLIST_MAKER:")) {
+            return "📂 " + line.replace("PLAYLIST_MAKER:", "").trim()
+                    + "\n⏳ Scanning Spotify...";
+        } else if (lowerLine.contains("downloaded \"") || lowerLine.contains("downloaded: ")) {
+            return previousStatus + "\n⬇️ Downloaded a new track!";
+        } else if (lowerLine.contains("scanning files")) {
+            return "\uD83D\uDD04 Updating Nextcloud Database...\n(This might take a moment)";
         }
+
         return previousStatus;
     }
 }
