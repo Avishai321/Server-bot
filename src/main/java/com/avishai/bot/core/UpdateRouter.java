@@ -1,6 +1,6 @@
 package com.avishai.bot.core;
 
-import com.avishai.bot.handlers.CommandHandler;
+import com.avishai.bot.handlers.commands.CommandHandler;
 import com.avishai.bot.utils.BotMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +23,17 @@ public class UpdateRouter {
     }
 
     public void route(Update update, MessageSender messageSender) {
-        if (!update.hasMessage() || !update.getMessage().hasText()) return;
+        long incomingChatId;
+        String messageText;
 
-        long incomingChatId = update.getMessage().getChatId();
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            incomingChatId = update.getMessage().getChatId();
+            messageText = update.getMessage().getText();
+        } else if (update.hasCallbackQuery()) {
+            incomingChatId = update.getCallbackQuery().getMessage().getChatId();
+            messageText = update.getCallbackQuery().getData();
+        } else return;
+
         String chatIdStr = String.valueOf(incomingChatId);
 
         if (incomingChatId != Config.AUTHORIZED_CHAT_ID) {
@@ -33,8 +41,7 @@ public class UpdateRouter {
             return;
         }
 
-        String messageText = update.getMessage().getText();
-        if (messageText.startsWith("/")) {
+        if (messageText != null && messageText.startsWith("/")) {
             String commandSignature = messageText.split(" ")[0];
             CommandHandler handler = commandRegistry.get(commandSignature);
 

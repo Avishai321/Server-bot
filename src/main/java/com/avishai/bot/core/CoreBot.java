@@ -7,6 +7,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 public class CoreBot extends TelegramLongPollingBot implements MessageSender {
@@ -34,10 +35,12 @@ public class CoreBot extends TelegramLongPollingBot implements MessageSender {
     }
 
     @Override
-    public Integer sendMessage(String chatId, String text) {
+    public Integer sendMessage(String chatId, String text, InlineKeyboardMarkup keyboard) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(text);
+        message.setParseMode("HTML");
+        if (keyboard != null) message.setReplyMarkup(keyboard);
         try {
             Message sentMessage = execute(message);
             return sentMessage.getMessageId();
@@ -48,17 +51,31 @@ public class CoreBot extends TelegramLongPollingBot implements MessageSender {
     }
 
     @Override
-    public void editMessage(String chatId, Integer messageId, String text) {
+    public Integer sendMessage(String chatId, String text) {
+        return sendMessage(chatId, text, null);
+    }
+
+    @Override
+    public void editMessage(String chatId, Integer messageId, String text, InlineKeyboardMarkup keyboard) {
         if (messageId == null) return;
 
         EditMessageText editMessage = new EditMessageText();
         editMessage.setChatId(chatId);
         editMessage.setMessageId(messageId);
         editMessage.setText(text);
+        editMessage.setParseMode("HTML");
+        if (keyboard != null) editMessage.setReplyMarkup(keyboard);
         try {
             execute(editMessage);
         } catch (TelegramApiException e) {
-            log.debug("Could not edit message {}: {}", messageId, e.getMessage());
+            if (!e.getMessage().contains("message is not modified")) {
+                log.debug("Could not edit message {}: {}", messageId, e.getMessage());
+            }
         }
+    }
+
+    @Override
+    public void editMessage(String chatId, Integer messageId, String text) {
+        editMessage(chatId, messageId, text, null);
     }
 }

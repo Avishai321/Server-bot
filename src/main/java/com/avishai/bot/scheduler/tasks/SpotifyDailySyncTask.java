@@ -2,7 +2,7 @@ package com.avishai.bot.scheduler.tasks;
 
 import com.avishai.bot.core.Config;
 import com.avishai.bot.core.MessageSender;
-import com.avishai.bot.handlers.SpotiSyncCommandHandler;
+import com.avishai.bot.handlers.commands.SpotiSyncHandler;
 import com.avishai.bot.scheduler.ScheduledTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,10 +14,10 @@ import java.util.concurrent.TimeUnit;
 
 public class SpotifyDailySyncTask implements ScheduledTask {
     private static final Logger log = LoggerFactory.getLogger(SpotifyDailySyncTask.class);
-    private final SpotiSyncCommandHandler handler;
+    private final SpotiSyncHandler handler;
     private final MessageSender messageSender;
 
-    public SpotifyDailySyncTask(SpotiSyncCommandHandler handler, MessageSender messageSender) {
+    public SpotifyDailySyncTask(SpotiSyncHandler handler, MessageSender messageSender) {
         this.handler = handler;
         this.messageSender = messageSender;
     }

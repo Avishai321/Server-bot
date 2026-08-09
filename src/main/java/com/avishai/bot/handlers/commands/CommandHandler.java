@@ -1,4 +1,4 @@
-package com.avishai.bot.handlers;
+package com.avishai.bot.handlers.commands;
 
 import com.avishai.bot.core.MessageSender;
 import org.telegram.telegrambots.meta.api.objects.Update;
