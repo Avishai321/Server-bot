@@ -17,8 +17,7 @@ public class StopSpotiSyncHandler implements CommandHandler {
     }
 
     @Override
-    public void handle(Update update, MessageSender messageSender) {
-        String chatId = update.getMessage().getChatId().toString();
+    public void handle(Update update, String chatId, MessageSender messageSender) {
         syncHandler.abortSync(chatId, messageSender);
     }
 }

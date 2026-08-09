@@ -47,7 +47,7 @@ public class UpdateRouter {
 
             if (handler != null) {
                 log.info("Executing command: {}", commandSignature);
-                handler.handle(update, messageSender);
+                handler.handle(update, chatIdStr, messageSender);
             } else handleUnknownCommand(chatIdStr, messageSender);
         }
     }
