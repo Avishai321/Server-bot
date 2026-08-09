@@ -31,6 +31,8 @@ public class SpotiSyncHandler implements CommandHandler {
     private final Pattern foundSongsPattern = Pattern.compile("(?i)Found (\\d+) songs");
     private final Pattern downloadedPattern = Pattern.compile("(?i)Downloaded \"(.+)\"");
     private final Pattern errorPattern = Pattern.compile("(?i)(failed to download|skipped|error:)");
+    private final Pattern searchingPattern = Pattern.compile("(?i)Searching for (.+)");
+    private final Pattern skippingPattern = Pattern.compile("(?i)Skipping (.+)");
 
     @Override
     public String getCommandSignature() {
@@ -197,6 +199,18 @@ public class SpotiSyncHandler implements CommandHandler {
         if (line.toLowerCase().contains("scanning files into nextcloud database")) {
             state.globalStatus = "Updating Nextcloud 🔄";
             state.currentTrackName = "Database Sync...";
+            return true;
+        }
+
+        Matcher searchMatcher = searchingPattern.matcher(line);
+        if (searchMatcher.find()) {
+            state.currentTrackName = "🔍 Matching: " + searchMatcher.group(1);
+            return true;
+        }
+
+        Matcher skipMatcher = skippingPattern.matcher(line);
+        if (skipMatcher.find()) {
+            state.currentTrackName = "⏩ Skipped: " + skipMatcher.group(1);
             return true;
         }
 
