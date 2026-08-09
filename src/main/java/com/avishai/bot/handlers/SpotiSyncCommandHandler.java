@@ -52,7 +52,8 @@ public class SpotiSyncCommandHandler implements CommandHandler {
     private void executeSyncProcess(String chatId, Integer messageId, MessageSender messageSender) {
         Process process = null;
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder(Config.SPOTIFY_BACKUP_SCRIPT_PATH);
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    "bash", Config.SPOTIFY_BACKUP_SCRIPT_PATH);
             processBuilder.redirectErrorStream(true);
             process = processBuilder.start();
 
@@ -75,6 +76,7 @@ public class SpotiSyncCommandHandler implements CommandHandler {
             }
 
             int exitCode = process.waitFor();
+            log.info("Process finished with exit code: {}", exitCode);
             if (exitCode == 0) {
                 messageSender.editMessage(chatId, messageId,
                         "✅ Spotify Sync Completed Successfully!\nNextcloud client index updated.");
