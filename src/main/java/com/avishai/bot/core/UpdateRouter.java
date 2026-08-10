@@ -1,7 +1,6 @@
 package com.avishai.bot.core;
 
 import com.avishai.bot.handlers.commands.CommandHandler;
-import com.avishai.bot.utils.BotMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.objects.Update;
