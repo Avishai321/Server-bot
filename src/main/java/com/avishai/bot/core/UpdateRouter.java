@@ -60,6 +60,8 @@ public class UpdateRouter {
     }
 
     public void handleUnknownCommand(String chatId, MessageSender messageSender) {
-        messageSender.sendMessage(chatId, BotMessages.UNKNOWN_COMMAND);
+        messageSender.sendMessage(chatId,
+                "⚠️ <b>Unknown Command</b>\n" +
+                        "I don't recognize that instruction. Type /help to see the available modules.");
     }
 }
