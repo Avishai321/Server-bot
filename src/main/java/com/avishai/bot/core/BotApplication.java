@@ -53,6 +53,9 @@ public class BotApplication {
 
         scheduler.startAll();
         log.info("Scheduler framework successfully started.");
+
+        bot.sendMessage(String.valueOf(Config.AUTHORIZED_CHAT_ID),
+                "🚀 <b>System Boot</b>\nHome Server Manager Daemon is online and ready.");
     }
 
     private static void setupNativeMenu(CoreBot bot) {
