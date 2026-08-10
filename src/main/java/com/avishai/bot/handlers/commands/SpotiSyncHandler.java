@@ -35,6 +35,14 @@ public class SpotiSyncHandler implements CommandHandler {
 
     public SpotiSyncHandler(ExecutorService executorService) {
         this.executorService = executorService;
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (this.currentProcess != null) {
+                log.warn("JVM Shutting down: Force-killing SpotiSync child processes...");
+                this.currentProcess.descendants().forEach(ProcessHandle::destroyForcibly);
+                this.currentProcess.destroyForcibly();
+            }
+        }));
     }
 
     @Override
