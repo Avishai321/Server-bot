@@ -11,12 +11,6 @@ import java.util.List;
 public class ShellExecutionService {
     private static final Logger log = LoggerFactory.getLogger(ShellExecutionService.class);
 
-    public record ShellResponse(int exitCode, String output, String error) {
-        public boolean isSuccess() {
-            return exitCode == 0;
-        }
-    }
-
     public static ShellResponse execute(List<String> command, File directory) {
         StringBuilder output = new StringBuilder();
         StringBuilder error = new StringBuilder();
@@ -53,5 +47,11 @@ public class ShellExecutionService {
 
     public static ShellResponse execute(List<String> command) {
         return execute(command, null);
+    }
+
+    public record ShellResponse(int exitCode, String output, String error) {
+        public boolean isSuccess() {
+            return exitCode == 0;
+        }
     }
 }

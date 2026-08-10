@@ -6,5 +6,6 @@ import java.util.List;
 
 public interface CommandHandler {
     List<String> getCommandSignature();
+
     void handle(CommandContext ctx);
 }

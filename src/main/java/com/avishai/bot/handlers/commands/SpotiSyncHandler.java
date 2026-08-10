@@ -23,7 +23,6 @@ public class SpotiSyncHandler implements CommandHandler {
     private static final Logger log = LoggerFactory.getLogger(SpotiSyncHandler.class);
     private final ExecutorService executorService;
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
-    private volatile Process currentProcess = null;
 
     private final Pattern playlistMarkerPattern = Pattern.compile(
             "PLAYLIST_MARKER:\\s*(\\d+)/(\\d+)\\s*-\\s*(.*)");
@@ -32,6 +31,7 @@ public class SpotiSyncHandler implements CommandHandler {
     private final Pattern errorPattern = Pattern.compile("(?i)(failed to download|skipped|error:)");
     private final Pattern searchingPattern = Pattern.compile("(?i)Searching for (.+)");
     private final Pattern skippingPattern = Pattern.compile("(?i)Skipping (.+)");
+    private volatile Process currentProcess = null;
 
     public SpotiSyncHandler(ExecutorService executorService) {
         this.executorService = executorService;
