@@ -170,11 +170,15 @@ public class DockerManagerHandler implements CommandHandler {
 
         var response = ShellExecutionService.execute(List.of("docker", "restart", containerName));
 
-        if (response.isSuccess()) {
-            ctx.edit(messageId, "✅ Container <code>" + containerName + "</code> successfully restarted.");
-        } else {
-            ctx.edit(messageId, "❌ Failed to restart <code>" + containerName + "</code>.\n<pre>" + response.error() + "</pre>");
-        }
+        if (response.isSuccess()) ctx.edit(
+                messageId,
+                "✅ Container <code>" + containerName + "</code> successfully restarted."
+        );
+        else ctx.edit(
+                messageId,
+                "❌ Failed to restart <code>" + containerName + "</code>.\n" +
+                        "<pre>" + response.error() + "</pre>"
+        );
     }
 
     private void fetchLogs(CommandContext ctx, String containerName, int lines, String format) {
@@ -182,7 +186,8 @@ public class DockerManagerHandler implements CommandHandler {
         var response = ShellExecutionService.execute(command);
 
         if (!response.isSuccess()) {
-            ctx.reply("❌ <b>Failed to fetch logs for</b> <code>" + containerName + "</code>:\n<pre>" + response.error() + "</pre>");
+            ctx.reply("❌ <b>Failed to fetch logs for</b> <code>" +
+                    containerName + "</code>:\n<pre>" + response.error() + "</pre>");
             return;
         }
 
@@ -208,7 +213,8 @@ public class DockerManagerHandler implements CommandHandler {
             if (logs.length() > 3800) {
                 logs = logs.substring(logs.length() - 3800) + "\n\n[Truncated...]";
             }
-            ctx.reply("📄 <b>Logs for</b> <code>" + containerName + "</code> (Last " + lines + " lines):\n<pre>" + logs + "</pre>");
+            ctx.reply("📄 <b>Logs for</b> <code>" + containerName +
+                    "</code> (Last " + lines + " lines):\n<pre>" + logs + "</pre>");
         }
     }
 }
