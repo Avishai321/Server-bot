@@ -1,9 +1,10 @@
 package com.avishai.bot.handlers.commands;
 
-import com.avishai.bot.core.MessageSender;
-import org.telegram.telegrambots.meta.api.objects.Update;
+import com.avishai.bot.core.CommandContext;
+
+import java.util.List;
 
 public interface CommandHandler {
-    String getCommandSignature();
-    void handle(Update update, String chatId, MessageSender messageSender);
+    List<String> getCommandSignature();
+    void handle(CommandContext ctx);
 }

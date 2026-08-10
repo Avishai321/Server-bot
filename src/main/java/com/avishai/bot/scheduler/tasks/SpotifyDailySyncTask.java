@@ -1,25 +1,22 @@
 package com.avishai.bot.scheduler.tasks;
 
-import com.avishai.bot.core.Config;
+import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.core.MessageSender;
 import com.avishai.bot.handlers.commands.SpotiSyncHandler;
-import com.avishai.bot.scheduler.ScheduledTask;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.avishai.bot.scheduler.TelegramScheduledTask;
+import com.avishai.bot.utils.BotCommands;
 
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.concurrent.TimeUnit;
 
-public class SpotifyDailySyncTask implements ScheduledTask {
-    private static final Logger log = LoggerFactory.getLogger(SpotifyDailySyncTask.class);
+public class SpotifyDailySyncTask extends TelegramScheduledTask {
     private final SpotiSyncHandler handler;
-    private final MessageSender messageSender;
 
     public SpotifyDailySyncTask(SpotiSyncHandler handler, MessageSender messageSender) {
+        super(messageSender);
         this.handler = handler;
-        this.messageSender = messageSender;
     }
 
     @Override
@@ -33,7 +30,9 @@ public class SpotifyDailySyncTask implements ScheduledTask {
         ZonedDateTime now = ZonedDateTime.now(zone);
         ZonedDateTime nextRun = now.withHour(3).withMinute(0).withSecond(0).withNano(0);
 
-        if (now.compareTo(nextRun) > 0) nextRun = nextRun.plusDays(1);
+        if (now.compareTo(nextRun) > 0) {
+            nextRun = nextRun.plusDays(1);
+        }
         return Duration.between(now, nextRun).getSeconds();
     }
 
@@ -43,13 +42,9 @@ public class SpotifyDailySyncTask implements ScheduledTask {
     }
 
     @Override
-    public void run() {
-        try {
-            String chatId = String.valueOf(Config.AUTHORIZED_CHAT_ID);
-            messageSender.sendMessage(chatId, "⏰ Scheduled 3:00 AM Automated Sync Executing...");
-            handler.triggerSync(chatId, messageSender);
-        } catch (Exception e) {
-            log.error("Failed to execute {}", getTaskName(), e);
-        }
+    protected void executeTask() {
+        notifyAdmin("⏰ <b>Automated System Event</b>\nInitiating scheduled 3:00 AM Spotify Sync...");
+        CommandContext ctx = createSystemContext(BotCommands.SPOTIFY_BACKUP);
+        handler.triggerSync(ctx);
     }
 }

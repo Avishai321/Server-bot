@@ -17,6 +17,9 @@ public class TaskScheduler {
     public TaskScheduler() {
         this.executorService = Executors.newScheduledThreadPool(2);
         this.tasks = new ArrayList<>();
+
+        // Ensure background threads stop cleanly when the bot restarts or updates
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
     public void registerTask(ScheduledTask task) {
@@ -28,16 +31,21 @@ public class TaskScheduler {
         for (ScheduledTask task : tasks) {
             long initialDelay = task.getInitialDelayInSeconds();
             long period = task.getPeriodInSeconds();
+            executorService.scheduleAtFixedRate(task, initialDelay, period, TimeUnit.SECONDS);
+            log.info("Task '{}' scheduled. Next run in {}s, interval: {}s", task.getTaskName(), initialDelay, period);
+        }
+    }
 
-            executorService.scheduleAtFixedRate(
-                    task,
-                    initialDelay,
-                    period,
-                    TimeUnit.SECONDS
-            );
-
-            log.info("Task '{}' scheduled to start in {} seconds, repeating every {} seconds.",
-                    task.getTaskName(), initialDelay, period);
+    private void shutdown() {
+        log.info("Shutting down TaskScheduler gracefully...");
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 }

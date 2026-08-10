@@ -1,5 +1,6 @@
 package com.avishai.bot.core;
 
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -13,15 +14,12 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class CoreBot extends TelegramLongPollingBot implements MessageSender {
     private static final Logger log = LoggerFactory.getLogger(CoreBot.class);
     private final String botUsername;
+    @Setter
     private UpdateRouter updateRouter;
 
     public CoreBot(String botUsername, String botToken) {
         super(botToken);
         this.botUsername = botUsername;
-    }
-
-    public void setUpdateRouter(UpdateRouter updateRouter) {
-        this.updateRouter = updateRouter;
     }
 
     @Override

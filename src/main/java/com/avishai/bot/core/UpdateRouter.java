@@ -18,8 +18,10 @@ public class UpdateRouter {
     }
 
     public void registerCommand(CommandHandler handler) {
-        commandRegistry.put(handler.getCommandSignature(), handler);
-        log.info("Registered command: {}", handler.getCommandSignature());
+        for (String signature : handler.getCommandSignature()) {
+            commandRegistry.put(signature, handler);
+            log.info("Registered command: {}", signature);
+        }
     }
 
     public void route(Update update, MessageSender messageSender) {
@@ -47,7 +49,12 @@ public class UpdateRouter {
 
             if (handler != null) {
                 log.info("Executing command: {}", commandSignature);
-                handler.handle(update, chatIdStr, messageSender);
+                handler.handle(new CommandContext(
+                        commandSignature,
+                        update,
+                        chatIdStr,
+                        messageSender
+                ));
             } else handleUnknownCommand(chatIdStr, messageSender);
         }
     }
