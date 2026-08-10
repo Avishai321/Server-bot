@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -27,18 +29,51 @@ public class DockerManagerHandler implements CommandHandler {
 
     @Override
     public void handle(CommandContext ctx) {
+        String fullCommand = "";
+
         if (ctx.update().hasCallbackQuery()) {
-            String callbackData = ctx.update().getCallbackQuery().getData();
-            if (callbackData.startsWith("/docker restart ")) {
-                String containerName = callbackData.replace("/docker restart ", "");
-                executorService.submit(() -> restartContainer(ctx, containerName));
-                return;
-            } else if (callbackData.startsWith("/docker logs ")) {
-                String containerName = callbackData.replace("/docker logs ", "");
-                executorService.submit(() -> fetchLogs(ctx, containerName));
+            fullCommand = ctx.update().getCallbackQuery().getData();
+        } else if (ctx.update().hasMessage() && ctx.update().getMessage().hasText()) {
+            fullCommand = ctx.update().getMessage().getText();
+        }
+
+        if (fullCommand.startsWith("/docker restart ")) {
+            String containerName = fullCommand.replace("/docker restart ", "").trim();
+            executorService.submit(() -> restartContainer(ctx, containerName));
+            return;
+        } else if (fullCommand.startsWith("/docker logs ")) {
+
+            // Parse arguments: /docker logs <container> [lines] [format]
+            String[] parts = fullCommand.split("\\s+");
+
+            if (parts.length >= 3) {
+                String containerName = parts[2];
+                int lines = 20;           // Default value
+                String format = "auto";   // Default value
+
+                // Override lines if provided
+                if (parts.length >= 4) {
+                    try {
+                        lines = Integer.parseInt(parts[3]);
+                    } catch (NumberFormatException ignored) {
+                        log.warn("Invalid line number provided, falling back to default.");
+                    }
+                }
+
+                // Override format if provided
+                if (parts.length >= 5) {
+                    format = parts[4].toLowerCase();
+                }
+
+                // Variables must be effectively final for lambda injection
+                int finalLines = lines;
+                String finalFormat = format;
+
+                executorService.submit(() -> fetchLogs(ctx, containerName, finalLines, finalFormat));
                 return;
             }
         }
+
         executorService.submit(() -> listContainers(ctx));
     }
 
@@ -95,23 +130,53 @@ public class DockerManagerHandler implements CommandHandler {
         );
         else ctx.edit(
                 msgId,
-                "❌ Failed to restart <code>" + containerName + "</code>.\n" +
-                        "<pre>" + response.error() + "</pre>"
+                "❌ Failed to restart <code>" + containerName +
+                        "</code>.\n<pre>" + response.error() + "</pre>"
         );
     }
 
-    private void fetchLogs(CommandContext ctx, String containerName) {
-        var response = ShellExecutionService.execute(List.of("docker", "logs", "--tail", "20", containerName));
+    private void fetchLogs(CommandContext ctx, String containerName, int lines, String format) {
+        var response = ShellExecutionService.execute(List.of(
+                "docker",
+                "logs",
+                "--tail",
+                String.valueOf(lines),
+                containerName)
+        );
+
         if (response.isSuccess()) {
             String logs = response.output();
+            if (logs.isEmpty()) {
+                logs = "[No recent logs found or container is silent]";
+            }
 
-            if (logs.isEmpty()) logs = "[No recent logs found or container is silent]";
-            if (logs.length() > 3800) logs = logs.substring(logs.length() - 3800);
+            boolean sendAsFile = format.equals("file") || (format.equals("auto") && logs.length() > 3800);
 
-            ctx.reply("📄 <b>Logs for</b> <code>" + containerName + "</code>:\n<pre>" + logs + "</pre>");
-        } else ctx.reply(
-                "❌ <b>Failed to fetch logs for</b> <code>" +
-                        containerName + "</code>:\n" +
-                        "<pre>" + response.error() + "</pre>");
+            if (sendAsFile) {
+                try {
+                    Path tempFilePath = Files.createTempFile(containerName + "_logs_", ".txt");
+                    Files.writeString(tempFilePath, logs);
+
+                    ctx.sendDocument("📄 <b>Logs for</b> <code>" + containerName +
+                            "</code> (Last " + lines + " lines)", tempFilePath.toFile());
+
+                    if (!Files.deleteIfExists(tempFilePath)) {
+                        log.warn("Failed to delete temporary log file: {}", tempFilePath.toAbsolutePath());
+                    }
+
+                } catch (Exception e) {
+                    log.error("Failed to generate temporary log file for {}", containerName, e);
+                    ctx.reply("❌ Failed to generate the log file.");
+                }
+            } else {
+                if (logs.length() > 3800) {
+                    logs = logs.substring(logs.length() - 3800) + "\n\n[Truncated...]";
+                }
+                ctx.reply("📄 <b>Logs for</b> <code>" + containerName +
+                        "</code> (Last " + lines + " lines):\n<pre>" + logs + "</pre>");
+            }
+        }
+        else ctx.reply("❌ <b>Failed to fetch logs for</b> <code>" +
+                containerName + "</code>:\n<pre>" + response.error() + "</pre>");
     }
 }

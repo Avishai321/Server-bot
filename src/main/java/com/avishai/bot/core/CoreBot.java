@@ -4,12 +4,16 @@ import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import java.io.File;
 
 public class CoreBot extends TelegramLongPollingBot implements MessageSender {
     private static final Logger log = LoggerFactory.getLogger(CoreBot.class);
@@ -75,5 +79,25 @@ public class CoreBot extends TelegramLongPollingBot implements MessageSender {
     @Override
     public void editMessage(String chatId, Integer messageId, String text) {
         editMessage(chatId, messageId, text, null);
+    }
+
+    @Override
+    public Integer sendDocument(String chatId, String caption, File file) {
+        SendDocument document = new SendDocument();
+        document.setChatId(chatId);
+        document.setDocument(new InputFile(file));
+
+        if (caption != null) {
+            document.setCaption(caption);
+            document.setParseMode("HTML");
+        }
+
+        try {
+            Message sentMessage = execute(document);
+            return sentMessage.getMessageId();
+        } catch (TelegramApiException e) {
+            log.error("Failed to send document to {}", chatId, e);
+            return null;
+        }
     }
 }
