@@ -15,6 +15,8 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class BotApplication {
     private static final Logger log = LoggerFactory.getLogger(BotApplication.class);
@@ -26,13 +28,18 @@ public class BotApplication {
         CoreBot bot = new CoreBot(Config.BOT_USERNAME, Config.BOT_TOKEN);
         bot.setUpdateRouter(router);
 
-        SpotiSyncHandler spotiSyncHandler = new SpotiSyncHandler();
+        // Centralized Global Thread Pool
+        ExecutorService globalExecutor = Executors.newCachedThreadPool();
+
+        SpotiSyncHandler spotiSyncHandler = new SpotiSyncHandler(globalExecutor);
         List<CommandHandler> handlers = List.of(
                 spotiSyncHandler,
-                new UpdateBotHandler(),
-                new DockerManagerHandler(),
+                new UpdateBotHandler(globalExecutor),
+                new DockerManagerHandler(globalExecutor),
+                new SysInfoHandler(globalExecutor),
                 new HelpHandler()
         );
+
         handlers.forEach(router::registerCommand);
 
         TaskScheduler scheduler = new TaskScheduler();
@@ -52,6 +59,7 @@ public class BotApplication {
         List<BotCommand> commands = new ArrayList<>();
         commands.add(new BotCommand(BotCommands.SPOTIFY_BACKUP, "Sync Spotify to Nextcloud"));
         commands.add(new BotCommand(BotCommands.DOCKER_MANAGER, "Manage Docker containers"));
+        commands.add(new BotCommand(BotCommands.SYS_INFO, "System hardware health"));
         commands.add(new BotCommand(BotCommands.UPDATE_BOT, "Recompile and restart bot"));
         commands.add(new BotCommand(BotCommands.HELP, "Show control menu"));
 

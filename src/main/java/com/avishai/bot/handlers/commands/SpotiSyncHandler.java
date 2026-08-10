@@ -15,14 +15,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SpotiSyncHandler implements CommandHandler {
     private static final Logger log = LoggerFactory.getLogger(SpotiSyncHandler.class);
-    private final ExecutorService executorService = Executors.newCachedThreadPool();
+    private final ExecutorService executorService;
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
     private volatile Process currentProcess = null;
 
@@ -34,6 +33,10 @@ public class SpotiSyncHandler implements CommandHandler {
     private final Pattern searchingPattern = Pattern.compile("(?i)Searching for (.+)");
     private final Pattern skippingPattern = Pattern.compile("(?i)Skipping (.+)");
 
+    public SpotiSyncHandler(ExecutorService executorService) {
+        this.executorService = executorService;
+    }
+
     @Override
     public List<String> getCommandSignature() {
         return Arrays.asList(BotCommands.SPOTIFY_BACKUP, BotCommands.STOP_SPOTIFY_BACKUP);
@@ -41,8 +44,10 @@ public class SpotiSyncHandler implements CommandHandler {
 
     @Override
     public void handle(CommandContext ctx) {
-        if (ctx.command().equals(BotCommands.SPOTIFY_BACKUP)) triggerSync(ctx);
-        else if (ctx.command().equals(BotCommands.STOP_SPOTIFY_BACKUP)) abortSync(ctx);
+        switch (ctx.command()) {
+            case BotCommands.SPOTIFY_BACKUP -> triggerSync(ctx);
+            case BotCommands.STOP_SPOTIFY_BACKUP -> abortSync(ctx);
+        }
     }
 
     private InlineKeyboardMarkup getActiveTaskKeyboard() {
@@ -62,8 +67,8 @@ public class SpotiSyncHandler implements CommandHandler {
 
     public void triggerSync(CommandContext ctx) {
         if (!isSyncing.compareAndSet(false, true)) {
-            ctx.reply("⚠️ A sync is already in progress!\n" +
-                    "🔴 Type " + BotCommands.STOP_SPOTIFY_BACKUP + " to terminate it.");
+            ctx.reply("⚠️ A sync is already in progress!\n🔴 Type " +
+                    BotCommands.STOP_SPOTIFY_BACKUP + " to terminate it.");
             return;
         }
 
@@ -78,7 +83,6 @@ public class SpotiSyncHandler implements CommandHandler {
             isSyncing.set(false);
             return;
         }
-
         executorService.submit(() -> executeSyncProcess(ctx, messageId));
     }
 
@@ -88,7 +92,9 @@ public class SpotiSyncHandler implements CommandHandler {
             currentProcess.descendants().forEach(ProcessHandle::destroyForcibly);
             currentProcess.destroyForcibly();
             ctx.reply("🛑 <b>Abort Signal Sent!</b>\nThe sync process is being forcibly terminated.");
-        } else ctx.reply("⚠️ No sync process is currently running.");
+        } else {
+            ctx.reply("⚠️ No sync process is currently running.");
+        }
     }
 
     private void executeSyncProcess(CommandContext ctx, Integer messageId) {
@@ -122,12 +128,12 @@ public class SpotiSyncHandler implements CommandHandler {
             } else if (exitCode == 0) {
                 state.globalStatus = "Completed ✅";
                 state.currentTrackName = "All tracks finished smoothly.";
-                if (state.tracksInCurrentPlaylist > 0)
+                if (state.tracksInCurrentPlaylist > 0) {
                     state.tracksProcessedInCurrent = state.tracksInCurrentPlaylist;
+                }
             } else {
                 state.globalStatus = "Failed ❌ (Code: " + exitCode + ")";
             }
-
             ctx.edit(messageId, state.renderCard());
 
         } catch (Exception e) {
@@ -154,11 +160,13 @@ public class SpotiSyncHandler implements CommandHandler {
             state.currentTrackName = "Scanning Spotify...";
             return true;
         }
+
         Matcher foundMatcher = foundSongsPattern.matcher(line);
         if (foundMatcher.find()) {
             state.tracksInCurrentPlaylist = Integer.parseInt(foundMatcher.group(1));
             return true;
         }
+
         Matcher downMatcher = downloadedPattern.matcher(line);
         if (downMatcher.find()) {
             state.tracksProcessedInCurrent++;
@@ -166,27 +174,32 @@ public class SpotiSyncHandler implements CommandHandler {
             state.currentTrackName = "⬇️ Downloaded: " + downMatcher.group(1);
             return true;
         }
+
         Matcher skipMatcher = skippingPattern.matcher(line);
         if (skipMatcher.find()) {
             state.tracksProcessedInCurrent++;
             state.currentTrackName = "⏩ Skipped: " + skipMatcher.group(1);
             return true;
         }
+
         Matcher searchMatcher = searchingPattern.matcher(line);
         if (searchMatcher.find()) {
             state.currentTrackName = "🔍 Matching: " + searchMatcher.group(1);
             return true;
         }
+
         Matcher errMatcher = errorPattern.matcher(line);
         if (errMatcher.find()) {
             state.globalFailed++;
             return true;
         }
+
         if (line.toLowerCase().contains("scanning files into nextcloud database")) {
             state.globalStatus = "Updating Nextcloud 🔄";
             state.currentTrackName = "Database Sync...";
             return true;
         }
+
         return false;
     }
 }
