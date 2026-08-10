@@ -7,7 +7,7 @@ public class Config {
     public static final String SPOTIFY_BACKUP_SCRIPT_PATH = System.getenv(
             "SPOTIFY_BACKUP_SCRIPT_PATH");
 
-    public static final String PROJECT_PATH = System.getenv("PROJECT_PATH");
+    public static final String PROJECT_PATH = "/home/avishai/projects/Server-bot";
 
     public static final long AUTHORIZED_CHAT_ID = Long.parseLong(
             System.getenv().getOrDefault("AUTHORIZED_CHAT_ID", "0"));
