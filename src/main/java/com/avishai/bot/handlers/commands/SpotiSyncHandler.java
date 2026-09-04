@@ -4,8 +4,7 @@ import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.core.Config;
 import com.avishai.bot.models.SpotiSyncState;
 import com.avishai.bot.utils.BotCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
@@ -19,8 +18,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Slf4j
 public class SpotiSyncHandler implements CommandHandler {
-    private static final Logger log = LoggerFactory.getLogger(SpotiSyncHandler.class);
     private final ExecutorService executorService;
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
 

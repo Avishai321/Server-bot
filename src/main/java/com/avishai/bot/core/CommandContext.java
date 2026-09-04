@@ -6,7 +6,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import java.io.File;
 
 public record CommandContext(String command, Update update, String chatId, MessageSender messageSender) {
-
     public Integer reply(String text) {
         return messageSender.sendMessage(this.chatId, text);
     }
@@ -23,8 +22,8 @@ public record CommandContext(String command, Update update, String chatId, Messa
         messageSender.editMessage(this.chatId, messageId, text, keyboard);
     }
 
-    public Integer sendDocument(String caption, File file) {
-        return messageSender.sendDocument(this.chatId, caption, file);
+    public void sendDocument(String caption, File file) {
+        messageSender.sendDocument(this.chatId, caption, file);
     }
 
     public String getActionData() {

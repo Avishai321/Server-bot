@@ -1,8 +1,7 @@
 package com.avishai.bot.core;
 
 import lombok.Setter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,8 +14,8 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.File;
 
+@Slf4j
 public class CoreBot extends TelegramLongPollingBot implements MessageSender {
-    private static final Logger log = LoggerFactory.getLogger(CoreBot.class);
     private final String botUsername;
     @Setter
     private UpdateRouter updateRouter;
@@ -82,7 +81,7 @@ public class CoreBot extends TelegramLongPollingBot implements MessageSender {
     }
 
     @Override
-    public Integer sendDocument(String chatId, String caption, File file) {
+    public void sendDocument(String chatId, String caption, File file) {
         SendDocument document = new SendDocument();
         document.setChatId(chatId);
         document.setDocument(new InputFile(file));
@@ -93,11 +92,9 @@ public class CoreBot extends TelegramLongPollingBot implements MessageSender {
         }
 
         try {
-            Message sentMessage = execute(document);
-            return sentMessage.getMessageId();
+            execute(document);
         } catch (TelegramApiException e) {
             log.error("Failed to send document to {}", chatId, e);
-            return null;
         }
     }
 }

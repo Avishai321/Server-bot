@@ -7,7 +7,6 @@ import java.util.Arrays;
 import java.util.List;
 
 public class HelpHandler implements CommandHandler {
-
     @Override
     public List<String> getCommandSignature() {
         return Arrays.asList(BotCommands.START, BotCommands.HELP);

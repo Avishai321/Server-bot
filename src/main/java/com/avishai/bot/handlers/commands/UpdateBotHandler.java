@@ -4,15 +4,14 @@ import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.core.Config;
 import com.avishai.bot.core.ShellExecutionService;
 import com.avishai.bot.utils.BotCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
+@Slf4j
 public class UpdateBotHandler implements CommandHandler {
-    private static final Logger log = LoggerFactory.getLogger(UpdateBotHandler.class);
     private final ExecutorService executorService;
 
     public UpdateBotHandler(ExecutorService executorService) {

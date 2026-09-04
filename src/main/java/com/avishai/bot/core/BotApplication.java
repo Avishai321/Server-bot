@@ -4,8 +4,7 @@ import com.avishai.bot.handlers.commands.*;
 import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.scheduler.tasks.SpotifyDailySyncTask;
 import com.avishai.bot.utils.BotCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
@@ -18,9 +17,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@Slf4j
 public class BotApplication {
-    private static final Logger log = LoggerFactory.getLogger(BotApplication.class);
-
     public static void start() throws Exception {
         validateEnvironment();
 

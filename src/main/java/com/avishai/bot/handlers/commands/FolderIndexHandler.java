@@ -22,7 +22,6 @@ import java.util.stream.Stream;
 @Slf4j
 @RequiredArgsConstructor
 public class FolderIndexHandler implements CommandHandler {
-
     private static final String ROOT_PATH_STR = "/mnt/d/data";
     private static final Path ROOT_PATH = Paths.get(ROOT_PATH_STR);
     private static final Path BOUNDARY_PATH = Paths.get("/mnt/d");
@@ -135,7 +134,10 @@ public class FolderIndexHandler implements CommandHandler {
 
     private void startIndexingProcess(CommandContext ctx, Path targetPath, Integer messageId) {
         if (!isIndexing.compareAndSet(false, true)) {
-            ctx.edit(messageId, "⚠️ <b>Action Denied:</b> Another bot indexing task is currently running.");
+            ctx.edit(
+                    messageId,
+                    "⚠️ <b>Action Denied:</b> Another bot indexing task is currently running."
+            );
             return;
         }
 

@@ -1,7 +1,6 @@
 package com.avishai.bot.core;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -9,10 +8,11 @@ import java.io.InputStreamReader;
 import java.util.List;
 import java.util.function.Consumer;
 
+@Slf4j
 public class ShellExecutionService {
-    private static final Logger log = LoggerFactory.getLogger(ShellExecutionService.class);
-
-    public static void executeStream(List<String> command, Consumer<String> onOutput, Consumer<Integer> onComplete) {
+    public static void executeStream(List<String> command,
+                                     Consumer<String> onOutput,
+                                     Consumer<Integer> onComplete) {
         try {
             Process process = new ProcessBuilder(command)
                     .redirectErrorStream(true)

@@ -3,11 +3,10 @@ package com.avishai.bot.scheduler;
 import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.core.Config;
 import com.avishai.bot.core.MessageSender;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public abstract class TelegramScheduledTask implements ScheduledTask {
-    protected final Logger log = LoggerFactory.getLogger(getClass());
     protected final MessageSender messageSender;
     protected final String adminChatId;
 

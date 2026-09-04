@@ -9,7 +9,6 @@ public class Config {
 
     public static final String SPOTIFY_BACKUP_SCRIPT_PATH = "/home/avishai/scripts/sync_music.sh";
     public static final String PROJECT_PATH = "/home/avishai/projects/Server-bot";
-    public static final String INDEX_ROOT_PATH = "/mnt/d/data";
 
     public static final long TELEGRAM_UPDATE_INTERVAL_MS = 2000;
 }

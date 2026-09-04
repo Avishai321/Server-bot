@@ -13,5 +13,5 @@ public interface MessageSender {
 
     void editMessage(String chatId, Integer messageId, String text);
 
-    Integer sendDocument(String chatId, String caption, File file);
+    void sendDocument(String chatId, String caption, File file);
 }
