@@ -26,6 +26,29 @@ public class DockerManagerHandler implements CommandHandler {
     }
 
     @Override
+    public String getCategory() {
+        return "🐳 Infrastructure";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Manage Docker containers";
+    }
+
+    @Override
+    public String getDetailedHelp() {
+        return """
+                🐳 <b>Docker Manager - Manual</b>
+                
+                <b>Interactive UI:</b>
+                Type <code>/docker</code> to get clickable buttons.
+                
+                <b>Direct CLI Commands:</b>
+                <code>/docker restart &lt;container&gt;</code>
+                <code>/docker logs &lt;container&gt; [lines] [format]</code>""";
+    }
+
+    @Override
     public void handle(CommandContext ctx) {
         String action = ctx.getActionData();
         Integer msgId = ctx.getMessageId();

@@ -21,6 +21,28 @@ public class SpotiSyncHandler implements CommandHandler {
     }
 
     @Override
+    public String getCategory() {
+        return "📁 Storage & Media";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Sync Spotify to Nextcloud";
+    }
+
+    @Override
+    public String getDetailedHelp() {
+        return """
+                🎵 <b>Spotify Sync - Manual</b>
+                
+                Executes SpotDL via system shell and updates Nextcloud database.
+                
+                <b>Commands:</b>
+                <code>/spotisync</code> - Start the sync process
+                <code>/stop_spotisync</code> - Forcibly terminate the process tree""";
+    }
+
+    @Override
     public void handle(CommandContext ctx) {
         String action = ctx.getActionData();
 

@@ -1,6 +1,5 @@
 package com.avishai.bot.core;
 
-import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.config.Config;
 import com.avishai.bot.handlers.*;
 import com.avishai.bot.scheduler.TaskScheduler;
@@ -36,18 +35,14 @@ public class BotApplication {
 
         // Initialize Services
         SpotifyService spotifyService = new SpotifyService();
-        DockerService dockerService = new DockerService();
-        SystemService systemService = new SystemService();
-        NextcloudService nextcloudService = new NextcloudService();
 
-        // Initialize Handlers (Controllers)
-        List<CommandHandler> handlers = List.of(
-                new SpotiSyncHandler(globalExecutor, spotifyService),
-                new UpdateBotHandler(globalExecutor, systemService),
-                new DockerManagerHandler(globalExecutor, dockerService),
-                new SysInfoHandler(globalExecutor, systemService),
-                new FolderIndexHandler(globalExecutor, nextcloudService),
-                new HelpHandler()
+        // Initialize and Register Handlers
+        List<CommandHandler> handlers = buildHandlers(
+                globalExecutor,
+                spotifyService,
+                new DockerService(),
+                new SystemService(),
+                new NextcloudService()
         );
         handlers.forEach(router::registerCommand);
 
@@ -59,7 +54,7 @@ public class BotApplication {
         botsApi.registerBot(bot);
         log.info("Telegram Bot API successfully registered.");
 
-        setupNativeMenu(bot);
+        setupNativeMenu(bot, handlers);
         scheduler.startAll();
 
         bot.sendMessage(String.valueOf(Config.AUTHORIZED_CHAT_ID),
@@ -67,14 +62,35 @@ public class BotApplication {
         );
     }
 
-    private static void setupNativeMenu(CoreBot bot) {
-        List<BotCommand> commands = new ArrayList<>();
-        commands.add(new BotCommand(BotCommands.HELP, "Show control menu"));
-        commands.add(new BotCommand(BotCommands.SYS_INFO, "System hardware health"));
-        commands.add(new BotCommand(BotCommands.DOCKER_MANAGER, "Manage Docker containers"));
-        commands.add(new BotCommand(BotCommands.INDEX_FOLDER, "Index specific folder"));
-        commands.add(new BotCommand(BotCommands.SPOTIFY_BACKUP, "Sync Spotify to Nextcloud"));
-        commands.add(new BotCommand(BotCommands.UPDATE_BOT, "Recompile and restart bot"));
+    private static List<CommandHandler> buildHandlers(
+            ExecutorService executor,
+            SpotifyService spotifyService,
+            DockerService dockerService,
+            SystemService systemService,
+            NextcloudService nextcloudService
+    ) {
+        List<CommandHandler> handlers = new ArrayList<>(List.of(
+                new SpotiSyncHandler(executor, spotifyService),
+                new UpdateBotHandler(executor, systemService),
+                new DockerManagerHandler(executor, dockerService),
+                new SysInfoHandler(executor, systemService),
+                new FolderIndexHandler(executor, nextcloudService)
+        ));
+
+        // HelpHandler requires the list of all other handlers to dynamically generate the menu
+        handlers.add(new HelpHandler(handlers));
+
+        return handlers;
+    }
+
+    private static void setupNativeMenu(CoreBot bot, List<CommandHandler> handlers) {
+        List<BotCommand> commands = handlers.stream()
+                .filter(h -> !h.getDescription().isEmpty())
+                .map(h -> new BotCommand(
+                        h.getCommandSignature().get(0),
+                        h.getDescription()
+                ))
+                .toList();
 
         try {
             bot.execute(new SetMyCommands(commands, new BotCommandScopeDefault(), null));

@@ -1,6 +1,5 @@
 package com.avishai.bot.scheduler;
 
-import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.config.Config;
 import com.avishai.bot.core.MessageSender;
 import lombok.extern.slf4j.Slf4j;
@@ -13,10 +12,6 @@ public abstract class TelegramScheduledTask implements ScheduledTask {
     public TelegramScheduledTask(MessageSender messageSender) {
         this.messageSender = messageSender;
         this.adminChatId = String.valueOf(Config.AUTHORIZED_CHAT_ID);
-    }
-
-    protected CommandContext createSystemContext(String virtualCommand) {
-        return new CommandContext(virtualCommand, null, adminChatId, messageSender);
     }
 
     protected void notifyAdmin(String message) {

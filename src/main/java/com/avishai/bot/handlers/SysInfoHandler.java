@@ -21,23 +21,33 @@ public class SysInfoHandler implements CommandHandler {
     }
 
     @Override
+    public String getCategory() {
+        return "⚙️ Monitoring & Admin";
+    }
+
+    @Override
+    public String getDescription() {
+        return "System hardware health";
+    }
+
+    @Override
     public void handle(CommandContext ctx) {
         Integer msgId = ctx.reply("🔍 <i>Gathering hardware telemetry...</i>");
 
         executorService.submit(() -> {
             try {
                 String uiCard = String.format("""
-                        🖥️ <b>Server Health Dashboard</b>
-                       \s
-                        ⏱️ <b>Uptime:</b> <code>%s</code>
-                       \s
-                        🧠 <b>Memory (RAM):</b>\s
-                        <code>%s</code>
-                       \s
-                        💾 <b>Storage (Root):</b>\s
-                        <code>%s</code>
-                       \s
-                        <i>✅ All systems operational</i>""",
+                                 🖥️ <b>Server Health Dashboard</b>
+                                \s
+                                 ⏱️ <b>Uptime:</b> <code>%s</code>
+                                \s
+                                 🧠 <b>Memory (RAM):</b>\s
+                                 <code>%s</code>
+                                \s
+                                 💾 <b>Storage (Root):</b>\s
+                                 <code>%s</code>
+                                \s
+                                 <i>✅ All systems operational</i>""",
                         systemService.getUptime(),
                         systemService.getRamUsage(),
                         systemService.getDiskUsage()

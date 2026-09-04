@@ -33,6 +33,29 @@ public class FolderIndexHandler implements CommandHandler {
     }
 
     @Override
+    public String getCategory() {
+        return "📁 Storage & Media";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Index specific server directories";
+    }
+
+    @Override
+    public String getDetailedHelp() {
+        return """
+                📁 <b>Directory Indexer - Manual</b>
+                
+                * Execute file indexing telemetry.
+                
+                <b>Features:</b>
+                • Navigates dynamically through directories.
+                • Security boundary restricted to <code>/mnt/d</code>.
+                • Streams real-time file processing speed and runtime.""";
+    }
+
+    @Override
     public void handle(CommandContext ctx) {
         String action = ctx.getActionData();
         Integer msgId = ctx.getMessageId();

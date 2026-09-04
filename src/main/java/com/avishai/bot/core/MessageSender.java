@@ -9,7 +9,11 @@ public interface MessageSender {
 
     Integer sendMessage(String chatId, String text);
 
-    void editMessage(String chatId, Integer messageId, String text, InlineKeyboardMarkup keyboard);
+    void editMessage(String chatId,
+                     Integer messageId,
+                     String text,
+                     InlineKeyboardMarkup keyboard
+    );
 
     void editMessage(String chatId, Integer messageId, String text);
 

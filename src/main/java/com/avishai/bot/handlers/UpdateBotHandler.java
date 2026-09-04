@@ -19,6 +19,16 @@ public class UpdateBotHandler implements CommandHandler {
     }
 
     @Override
+    public String getCategory() {
+        return "⚙️ Monitoring & Admin";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Recompile and restart bot";
+    }
+
+    @Override
     public void handle(CommandContext ctx) {
         Integer msgId = ctx.reply("""
                 🛠️ <b>System Update</b>
