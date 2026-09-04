@@ -7,9 +7,29 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class ShellExecutionService {
     private static final Logger log = LoggerFactory.getLogger(ShellExecutionService.class);
+
+    public static void executeStream(List<String> command, Consumer<String> onOutput, Consumer<Integer> onComplete) {
+        try {
+            Process process = new ProcessBuilder(command)
+                    .redirectErrorStream(true)
+                    .start();
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                reader.lines().forEach(onOutput);
+            }
+
+            int exitCode = process.waitFor();
+            if (onComplete != null) onComplete.accept(exitCode);
+        } catch (Exception e) {
+            log.error("Stream execution failed for command: {}", String.join(" ", command), e);
+            if (onOutput != null) onOutput.accept("Critical Error: " + e.getMessage());
+            if (onComplete != null) onComplete.accept(-1);
+        }
+    }
 
     public static ShellResponse execute(List<String> command, File directory) {
         StringBuilder output = new StringBuilder();

@@ -37,6 +37,7 @@ public class BotApplication {
                 new UpdateBotHandler(globalExecutor),
                 new DockerManagerHandler(globalExecutor),
                 new SysInfoHandler(globalExecutor),
+                new FolderIndexHandler(globalExecutor),
                 new HelpHandler()
         );
 
@@ -60,11 +61,12 @@ public class BotApplication {
 
     private static void setupNativeMenu(CoreBot bot) {
         List<BotCommand> commands = new ArrayList<>();
-        commands.add(new BotCommand(BotCommands.SPOTIFY_BACKUP, "Sync Spotify to Nextcloud"));
-        commands.add(new BotCommand(BotCommands.DOCKER_MANAGER, "Manage Docker containers"));
-        commands.add(new BotCommand(BotCommands.SYS_INFO, "System hardware health"));
-        commands.add(new BotCommand(BotCommands.UPDATE_BOT, "Recompile and restart bot"));
         commands.add(new BotCommand(BotCommands.HELP, "Show control menu"));
+        commands.add(new BotCommand(BotCommands.SYS_INFO, "System hardware health"));
+        commands.add(new BotCommand(BotCommands.DOCKER_MANAGER, "Manage Docker containers"));
+        commands.add(new BotCommand(BotCommands.INDEX_FOLDER, "Index specific folder"));
+        commands.add(new BotCommand(BotCommands.SPOTIFY_BACKUP, "Sync Spotify to Nextcloud"));
+        commands.add(new BotCommand(BotCommands.UPDATE_BOT, "Recompile and restart bot"));
 
         try {
             bot.execute(new SetMyCommands(commands, new BotCommandScopeDefault(), null));

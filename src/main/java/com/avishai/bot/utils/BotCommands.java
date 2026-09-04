@@ -1,11 +1,12 @@
 package com.avishai.bot.utils;
 
 public class BotCommands {
-    public final static String START = "/start";
-    public final static String HELP = "/help";
-    public final static String SPOTIFY_BACKUP = "/spotisync";
-    public final static String STOP_SPOTIFY_BACKUP = "/stop_spotisync";
-    public final static String UPDATE_BOT = "/updatebot";
-    public final static String DOCKER_MANAGER = "/docker";
-    public final static String SYS_INFO = "/sysinfo";
+    public static final String START = "/start";
+    public static final String HELP = "/help";
+    public static final String SPOTIFY_BACKUP = "/spotisync";
+    public static final String STOP_SPOTIFY_BACKUP = "/stop_spotisync";
+    public static final String UPDATE_BOT = "/updatebot";
+    public static final String DOCKER_MANAGER = "/docker";
+    public static final String SYS_INFO = "/sysinfo";
+    public static final String INDEX_FOLDER = "/index";
 }

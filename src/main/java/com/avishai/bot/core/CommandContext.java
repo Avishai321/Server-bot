@@ -26,4 +26,15 @@ public record CommandContext(String command, Update update, String chatId, Messa
     public Integer sendDocument(String caption, File file) {
         return messageSender.sendDocument(this.chatId, caption, file);
     }
+
+    public String getActionData() {
+        if (update.hasCallbackQuery()) return update.getCallbackQuery().getData();
+        if (update.hasMessage() && update.getMessage().hasText()) return update.getMessage().getText();
+        return "";
+    }
+
+    public Integer getMessageId() {
+        if (update.hasCallbackQuery()) return update.getCallbackQuery().getMessage().getMessageId();
+        return null; // A new message doesn't have an existing messageId to edit
+    }
 }
