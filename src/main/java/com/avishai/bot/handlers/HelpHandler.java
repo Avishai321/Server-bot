@@ -18,8 +18,8 @@ public class HelpHandler implements CommandHandler {
     }
 
     @Override
-    public String getCategory() {
-        return "⚙️ Monitoring & Admin";
+    public HandlerCategory getCategory() {
+        return HandlerCategory.MONITORING_AND_ADMIN;
     }
 
     @Override
@@ -37,8 +37,8 @@ public class HelpHandler implements CommandHandler {
     }
 
     private void sendGeneralHelp(CommandContext ctx) {
-        // Group all handlers by their category dynamically
-        Map<String, List<CommandHandler>> groupedHandlers = registeredHandlers.stream()
+        // Group handlers by the Enum
+        Map<HandlerCategory, List<CommandHandler>> groupedHandlers = registeredHandlers.stream()
                 .filter(h -> !h.getDescription().isEmpty())
                 .collect(Collectors.groupingBy(CommandHandler::getCategory));
 
@@ -50,18 +50,22 @@ public class HelpHandler implements CommandHandler {
                 
                 """);
 
-        // Render each category and its commands
-        groupedHandlers.forEach((category, handlers) -> {
-            helpText.append("<b>").append(category).append("</b>\n");
-            for (CommandHandler handler : handlers) {
-                // Use the first command signature as the primary display command
-                helpText.append(handler.getCommandSignature().get(0))
-                        .append(" - ")
-                        .append(handler.getDescription())
-                        .append("\n");
+        // Iterate over Enum.values() to enforce consistent, predictable rendering order
+        for (HandlerCategory category : HandlerCategory.values()) {
+            List<CommandHandler> handlers = groupedHandlers.get(category);
+
+            if (handlers != null && !handlers.isEmpty()) {
+                helpText.append("<b>").append(category.getDisplayName()).append("</b>\n");
+
+                for (CommandHandler handler : handlers) {
+                    helpText.append(handler.getCommandSignature().get(0))
+                            .append(" - ")
+                            .append(handler.getDescription())
+                            .append("\n");
+                }
+                helpText.append("\n");
             }
-            helpText.append("\n");
-        });
+        }
 
         helpText.append("💡 <b>Pro Tip:</b> Type <code>/help [command]</code> for advanced syntax.");
         ctx.reply(helpText.toString());

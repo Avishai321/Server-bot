@@ -7,8 +7,8 @@ import java.util.List;
 public interface CommandHandler {
     List<String> getCommandSignature();
 
-    default String getCategory() {
-        return "Other";
+    default HandlerCategory getCategory() {
+        return HandlerCategory.OTHER;
     }
 
     default String getDescription() {

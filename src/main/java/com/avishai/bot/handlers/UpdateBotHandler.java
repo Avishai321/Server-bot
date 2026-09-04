@@ -19,8 +19,8 @@ public class UpdateBotHandler implements CommandHandler {
     }
 
     @Override
-    public String getCategory() {
-        return "⚙️ Monitoring & Admin";
+    public HandlerCategory getCategory() {
+        return HandlerCategory.MONITORING_AND_ADMIN;
     }
 
     @Override

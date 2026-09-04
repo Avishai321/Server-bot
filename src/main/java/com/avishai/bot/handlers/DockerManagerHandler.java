@@ -26,8 +26,8 @@ public class DockerManagerHandler implements CommandHandler {
     }
 
     @Override
-    public String getCategory() {
-        return "🐳 Infrastructure";
+    public HandlerCategory getCategory() {
+        return HandlerCategory.INFRASTRUCTURE;
     }
 
     @Override

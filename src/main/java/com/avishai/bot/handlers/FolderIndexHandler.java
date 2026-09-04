@@ -33,8 +33,8 @@ public class FolderIndexHandler implements CommandHandler {
     }
 
     @Override
-    public String getCategory() {
-        return "📁 Storage & Media";
+    public HandlerCategory getCategory() {
+        return HandlerCategory.STORAGE_AND_MEDIA;
     }
 
     @Override
