@@ -1,7 +1,7 @@
 package com.avishai.bot.scheduler;
 
 import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.core.Config;
+import com.avishai.bot.config.Config;
 import com.avishai.bot.core.MessageSender;
 import lombok.extern.slf4j.Slf4j;
 

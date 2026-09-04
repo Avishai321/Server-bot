@@ -1,7 +1,7 @@
-package com.avishai.bot.handlers.commands;
+package com.avishai.bot.handlers;
 
 import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.utils.BotCommands;
+import com.avishai.bot.config.BotCommands;
 
 import java.util.Arrays;
 import java.util.List;

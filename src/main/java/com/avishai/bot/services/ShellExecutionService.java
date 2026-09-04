@@ -1,5 +1,6 @@
-package com.avishai.bot.core;
+package com.avishai.bot.services;
 
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 @Slf4j
+@UtilityClass
 public class ShellExecutionService {
     public static void executeStream(List<String> command,
                                      Consumer<String> onOutput,

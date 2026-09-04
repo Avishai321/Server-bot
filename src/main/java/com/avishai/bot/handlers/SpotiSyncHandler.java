@@ -1,9 +1,9 @@
-package com.avishai.bot.handlers.commands;
+package com.avishai.bot.handlers;
 
 import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.core.Config;
+import com.avishai.bot.config.Config;
 import com.avishai.bot.models.SpotiSyncState;
-import com.avishai.bot.utils.BotCommands;
+import com.avishai.bot.config.BotCommands;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;

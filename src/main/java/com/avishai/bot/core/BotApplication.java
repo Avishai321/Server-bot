@@ -1,9 +1,10 @@
 package com.avishai.bot.core;
 
-import com.avishai.bot.handlers.commands.*;
+import com.avishai.bot.config.Config;
+import com.avishai.bot.handlers.*;
 import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.scheduler.tasks.SpotifyDailySyncTask;
-import com.avishai.bot.utils.BotCommands;
+import com.avishai.bot.config.BotCommands;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;

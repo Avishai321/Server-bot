@@ -1,8 +1,9 @@
-package com.avishai.bot.handlers.commands;
+package com.avishai.bot.handlers;
 
 import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.core.ShellExecutionService;
-import com.avishai.bot.utils.BotCommands;
+import com.avishai.bot.services.ShellExecutionService;
+import com.avishai.bot.config.BotCommands;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -14,12 +15,9 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 @Slf4j
+@RequiredArgsConstructor
 public class DockerManagerHandler implements CommandHandler {
     private final ExecutorService executorService;
-
-    public DockerManagerHandler(ExecutorService executorService) {
-        this.executorService = executorService;
-    }
 
     @Override
     public List<String> getCommandSignature() {

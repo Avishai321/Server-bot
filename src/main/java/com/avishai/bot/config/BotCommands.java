@@ -1,5 +1,8 @@
-package com.avishai.bot.utils;
+package com.avishai.bot.config;
 
+import lombok.experimental.UtilityClass;
+
+@UtilityClass
 public class BotCommands {
     public static final String START = "/start";
     public static final String HELP = "/help";

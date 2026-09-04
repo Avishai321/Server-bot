@@ -2,9 +2,9 @@ package com.avishai.bot.scheduler.tasks;
 
 import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.core.MessageSender;
-import com.avishai.bot.handlers.commands.SpotiSyncHandler;
+import com.avishai.bot.handlers.SpotiSyncHandler;
 import com.avishai.bot.scheduler.TelegramScheduledTask;
-import com.avishai.bot.utils.BotCommands;
+import com.avishai.bot.config.BotCommands;
 
 import java.time.Duration;
 import java.time.ZoneId;

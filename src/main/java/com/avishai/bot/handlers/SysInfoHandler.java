@@ -1,21 +1,18 @@
-package com.avishai.bot.handlers.commands;
+package com.avishai.bot.handlers;
 
 import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.core.ShellExecutionService;
-import com.avishai.bot.utils.BotCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.avishai.bot.services.ShellExecutionService;
+import com.avishai.bot.config.BotCommands;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
+@Slf4j
+@RequiredArgsConstructor
 public class SysInfoHandler implements CommandHandler {
-    private static final Logger log = LoggerFactory.getLogger(SysInfoHandler.class);
     private final ExecutorService executorService;
-
-    public SysInfoHandler(ExecutorService executorService) {
-        this.executorService = executorService;
-    }
 
     @Override
     public List<String> getCommandSignature() {

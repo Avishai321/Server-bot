@@ -1,5 +1,8 @@
-package com.avishai.bot.core;
+package com.avishai.bot.config;
 
+import lombok.experimental.UtilityClass;
+
+@UtilityClass
 public class Config {
     public static final String BOT_TOKEN = System.getenv("BOT_TOKEN");
     public static final String BOT_USERNAME = System.getenv("BOT_USERNAME");

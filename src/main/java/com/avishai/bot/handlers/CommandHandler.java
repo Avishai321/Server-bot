@@ -1,4 +1,4 @@
-package com.avishai.bot.handlers.commands;
+package com.avishai.bot.handlers;
 
 import com.avishai.bot.core.CommandContext;
 
