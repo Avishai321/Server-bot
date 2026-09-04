@@ -1,8 +1,8 @@
 package com.avishai.bot.handlers;
 
-import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.services.ShellExecutionService;
 import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.core.CommandContext;
+import com.avishai.bot.services.SystemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 @RequiredArgsConstructor
 public class SysInfoHandler implements CommandHandler {
     private final ExecutorService executorService;
+    private final SystemService systemService;
 
     @Override
     public List<String> getCommandSignature() {
@@ -21,41 +22,30 @@ public class SysInfoHandler implements CommandHandler {
 
     @Override
     public void handle(CommandContext ctx) {
-        Integer msgId = ctx.reply("📊 <i>Gathering hardware telemetry...</i> ⏳");
+        Integer msgId = ctx.reply("🔍 <i>Gathering hardware telemetry...</i>");
 
         executorService.submit(() -> {
             try {
-                var ramData = ShellExecutionService.execute(List.of(
-                        "bash", "-c", "free -h | grep Mem | awk '{print $3 \" / \" $2}'"));
-
-                var rootDiskData = ShellExecutionService.execute(List.of(
-                        "bash", "-c", "df -h / | tail -1 | awk '{print $3 \" / \" $2 \" (\"$5\")\"}'"));
-
-                var uptimeData = ShellExecutionService.execute(List.of("uptime", "-p"));
-
-                String uiCard = """
-                        💻 <b>Server Health Dashboard</b>
-                        ━━━━━━━━━━━━━━━━━━
+                String uiCard = String.format("""
+                        🖥️ <b>Server Health Dashboard</b>
+                       \s
                         ⏱️ <b>Uptime:</b> <code>%s</code>
-                        
-                        🧠 <b>Memory (RAM):</b>
+                       \s
+                        🧠 <b>Memory (RAM):</b>\s
                         <code>%s</code>
-                        
-                        💾 <b>Storage (Root):</b>
+                       \s
+                        💾 <b>Storage (Root):</b>\s
                         <code>%s</code>
-                        ━━━━━━━━━━━━━━━━━━
-                        🟢 <i>All systems operational</i>
-                        """.formatted(
-                        uptimeData.isSuccess() ? uptimeData.output().replace("up ", "") : "Unknown",
-                        ramData.isSuccess() ? ramData.output() : "Error reading RAM",
-                        rootDiskData.isSuccess() ? rootDiskData.output() : "Error reading Disk"
+                       \s
+                        <i>✅ All systems operational</i>""",
+                        systemService.getUptime(),
+                        systemService.getRamUsage(),
+                        systemService.getDiskUsage()
                 );
-
                 ctx.edit(msgId, uiCard);
-
             } catch (Exception e) {
                 log.error("Failed to fetch system info", e);
-                ctx.edit(msgId, "⚠️ <b>Error fetching telemetry:</b>\n" + e.getMessage());
+                ctx.edit(msgId, "❌ <b>Error fetching telemetry:</b>\n" + e.getMessage());
             }
         });
     }

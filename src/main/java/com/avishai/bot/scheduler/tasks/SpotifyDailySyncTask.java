@@ -1,10 +1,8 @@
 package com.avishai.bot.scheduler.tasks;
 
-import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.core.MessageSender;
-import com.avishai.bot.handlers.SpotiSyncHandler;
 import com.avishai.bot.scheduler.TelegramScheduledTask;
-import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.services.SpotifyService;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -12,11 +10,11 @@ import java.time.ZonedDateTime;
 import java.util.concurrent.TimeUnit;
 
 public class SpotifyDailySyncTask extends TelegramScheduledTask {
-    private final SpotiSyncHandler handler;
+    private final SpotifyService spotifyService;
 
-    public SpotifyDailySyncTask(SpotiSyncHandler handler, MessageSender messageSender) {
+    public SpotifyDailySyncTask(SpotifyService spotifyService, MessageSender messageSender) {
         super(messageSender);
-        this.handler = handler;
+        this.spotifyService = spotifyService;
     }
 
     @Override
@@ -29,10 +27,7 @@ public class SpotifyDailySyncTask extends TelegramScheduledTask {
         ZoneId zone = ZoneId.of("Asia/Jerusalem");
         ZonedDateTime now = ZonedDateTime.now(zone);
         ZonedDateTime nextRun = now.withHour(3).withMinute(0).withSecond(0).withNano(0);
-
-        if (now.compareTo(nextRun) > 0) {
-            nextRun = nextRun.plusDays(1);
-        }
+        if (now.compareTo(nextRun) > 0) nextRun = nextRun.plusDays(1);
         return Duration.between(now, nextRun).getSeconds();
     }
 
@@ -43,8 +38,14 @@ public class SpotifyDailySyncTask extends TelegramScheduledTask {
 
     @Override
     protected void executeTask() {
-        notifyAdmin("⏰ <b>Automated System Event</b>\nInitiating scheduled 3:00 AM Spotify Sync...");
-        CommandContext ctx = createSystemContext(BotCommands.SPOTIFY_BACKUP);
-        handler.triggerSync(ctx);
+        if (spotifyService.isBusy()) return;
+
+        notifyAdmin("🔄 <b>Automated System Event</b>\nInitiating scheduled 3:00 AM Spotify Sync...");
+
+        // Execute the service completely independent of the Controller Handler
+        spotifyService.runSync(state -> {
+            // Optional: You could update an active message ID here if you want daily logs to stream to the chat.
+            // For now, it runs silently in the background exactly as requested.
+        });
     }
 }

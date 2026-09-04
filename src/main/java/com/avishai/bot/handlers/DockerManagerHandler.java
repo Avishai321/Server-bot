@@ -1,8 +1,8 @@
 package com.avishai.bot.handlers;
 
-import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.services.ShellExecutionService;
 import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.core.CommandContext;
+import com.avishai.bot.services.DockerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 @RequiredArgsConstructor
 public class DockerManagerHandler implements CommandHandler {
     private final ExecutorService executorService;
+    private final DockerService dockerService;
 
     @Override
     public List<String> getCommandSignature() {
@@ -26,73 +27,39 @@ public class DockerManagerHandler implements CommandHandler {
 
     @Override
     public void handle(CommandContext ctx) {
-        String fullCommand = extractCommand(ctx);
+        String action = ctx.getActionData();
+        Integer msgId = ctx.getMessageId();
 
-        // Variables must be effectively final for thread injection
-        final Integer finalMsgId = extractMessageId(ctx);
-
-        if (fullCommand.equals(BotCommands.DOCKER_MANAGER)) {
-            executorService.submit(() -> sendMainList(ctx, finalMsgId));
-
-        } else if (fullCommand.startsWith("/docker menu ")) {
-            String name = fullCommand.replace("/docker menu ", "").trim();
-            executorService.submit(() -> sendContainerMenu(ctx, name, finalMsgId));
-
-        } else if (fullCommand.startsWith("/docker restart ")) {
-            String name = fullCommand.replace("/docker restart ", "").trim();
-            executorService.submit(() -> restartContainer(ctx, name, finalMsgId));
-
-        } else if (fullCommand.startsWith("/docker logs ")) {
-            String[] parts = fullCommand.split("\\s+");
+        if (action.equals(BotCommands.DOCKER_MANAGER)) {
+            executorService.submit(() -> sendMainList(ctx, msgId));
+        } else if (action.startsWith("/docker menu ")) {
+            String name = action.replace("/docker menu ", "").trim();
+            executorService.submit(() -> sendContainerMenu(ctx, name, msgId));
+        } else if (action.startsWith("/docker restart ")) {
+            String name = action.replace("/docker restart ", "").trim();
+            executorService.submit(() -> restartContainer(ctx, name, msgId));
+        } else if (action.startsWith("/docker logs ")) {
+            String[] parts = action.split("\\s+");
             if (parts.length >= 3) {
                 String name = parts[2];
                 int lines = (parts.length >= 4) ? parseLinesArg(parts[3]) : 20;
                 String format = (parts.length >= 5) ? parts[4].toLowerCase() : "auto";
-
                 executorService.submit(() -> fetchLogs(ctx, name, lines, format));
             }
         }
     }
 
-    private String extractCommand(CommandContext ctx) {
-        if (ctx.update().hasCallbackQuery()) {
-            return ctx.update().getCallbackQuery().getData();
-        } else if (ctx.update().hasMessage() && ctx.update().getMessage().hasText()) {
-            return ctx.update().getMessage().getText();
-        }
-        return "";
-    }
-
-    private Integer extractMessageId(CommandContext ctx) {
-        if (ctx.update().hasCallbackQuery()) {
-            return ctx.update().getCallbackQuery().getMessage().getMessageId();
-        }
-        return null;
-    }
-
-    private int parseLinesArg(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            return 20;
-        }
-    }
-
     private void sendMainList(CommandContext ctx, Integer messageId) {
-        var command = List.of("docker", "ps", "--format", "{{.Names}}");
-        var response = ShellExecutionService.execute(command);
-
-        if (!response.isSuccess()) {
-            ctx.reply("⚠️ Failed to reach Docker engine.\n<pre>" + response.error() + "</pre>");
+        String[] containers = dockerService.listContainers();
+        if (containers.length == 0) {
+            ctx.reply("❌ Failed to fetch containers from Docker engine.");
             return;
         }
-
-        String text = "🐳 <b>Docker Management</b>\n━━━━━━━━━━━━━━━━━━\nSelect a container to manage:";
-        String[] containers = response.output().split("\n");
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(buildContainerGrid(containers));
 
+        String text = "🐳 <b>Docker Management</b>\n\nSelect a container to manage:";
         if (messageId != null) ctx.edit(messageId, text, markup);
         else ctx.reply(text, markup);
     }
@@ -114,24 +81,12 @@ public class DockerManagerHandler implements CommandHandler {
                 currentRow = new ArrayList<>();
             }
         }
-        if (!currentRow.isEmpty()) {
-            rows.add(currentRow);
-        }
+        if (!currentRow.isEmpty()) rows.add(currentRow);
         return rows;
     }
 
     private void sendContainerMenu(CommandContext ctx, String name, Integer messageId) {
-        var command = List.of("docker", "ps", "--filter", "name=^/" + name + "$", "--format", "{{.Status}}");
-        var response = ShellExecutionService.execute(command);
-
-        String status = (response.isSuccess() && !response.output().isEmpty())
-                ? response.output()
-                : "Offline / Exited";
-
-        String text = "📦 <b>Container:</b> <code>" + name + "</code>\n🕒 <b>Status:</b> " + status;
-
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        String status = dockerService.getContainerStatus(name);
 
         InlineKeyboardButton restartBtn = new InlineKeyboardButton();
         restartBtn.setText("🔄 Restart");
@@ -145,46 +100,41 @@ public class DockerManagerHandler implements CommandHandler {
         backBtn.setText("🔙 Back to List");
         backBtn.setCallbackData(BotCommands.DOCKER_MANAGER);
 
-        rows.add(List.of(restartBtn, logsBtn));
-        rows.add(List.of(backBtn));
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(List.of(List.of(restartBtn, logsBtn), List.of(backBtn)));
 
-        markup.setKeyboard(rows);
+        String text = String.format("""
+                📦 <b>Container:</b> <code>%s</code>
+                📊 <b>Status:</b> %s""", name, status);
 
-        if (messageId != null) {
-            ctx.edit(messageId, text, markup);
-        } else {
-            ctx.reply(text, markup);
-        }
+        if (messageId != null) ctx.edit(messageId, text, markup);
+        else ctx.reply(text, markup);
     }
 
-    private void restartContainer(CommandContext ctx, String containerName, Integer messageId) {
-        String waitMsg = "🐳 Restarting <code>" + containerName + "</code>... ⏳";
-        if (messageId != null) {
-            ctx.edit(messageId, waitMsg, null);
-        } else {
-            messageId = ctx.reply(waitMsg);
-        }
+    private void restartContainer(CommandContext ctx, String name, Integer messageId) {
+        String waitMsg = String.format("🔄 Restarting <code>%s</code>...", name);
+        if (messageId != null) ctx.edit(messageId, waitMsg, null);
+        else messageId = ctx.reply(waitMsg);
 
-        var response = ShellExecutionService.execute(List.of("docker", "restart", containerName));
+        var response = dockerService.restartContainer(name);
 
         if (response.isSuccess()) ctx.edit(
                 messageId,
-                "✅ Container <code>" + containerName + "</code> successfully restarted."
+                String.format("✅ Container <code>%s</code> successfully restarted.", name)
         );
         else ctx.edit(
                 messageId,
-                "❌ Failed to restart <code>" + containerName + "</code>.\n" +
-                        "<pre>" + response.error() + "</pre>"
+                String.format("❌ Failed to restart <code>%s</code>.\n<pre>%s</pre>", name, response.error())
         );
     }
 
-    private void fetchLogs(CommandContext ctx, String containerName, int lines, String format) {
-        var command = List.of("docker", "logs", "--tail", String.valueOf(lines), containerName);
-        var response = ShellExecutionService.execute(command);
+    private void fetchLogs(CommandContext ctx, String name, int lines, String format) {
+        var response = dockerService.getLogs(name, lines);
 
         if (!response.isSuccess()) {
-            ctx.reply("❌ <b>Failed to fetch logs for</b> <code>" +
-                    containerName + "</code>:\n<pre>" + response.error() + "</pre>");
+            ctx.reply(String.format("❌ <b>Failed to fetch logs for</b> <code>%s</code>:\n<pre>%s</pre>",
+                    name, response.error()
+            ));
             return;
         }
 
@@ -193,25 +143,33 @@ public class DockerManagerHandler implements CommandHandler {
 
         if (sendAsFile) {
             try {
-                Path tempFilePath = Files.createTempFile(containerName + "_logs_", ".txt");
+                Path tempFilePath = Files.createTempFile(name + "_logs_", ".txt");
                 Files.writeString(tempFilePath, logs);
-
-                String caption = "📄 <b>Logs for</b> <code>" + containerName + "</code> (Last " + lines + " lines)";
-                ctx.sendDocument(caption, tempFilePath.toFile());
-
-                if (!Files.deleteIfExists(tempFilePath)) {
-                    log.warn("Failed to delete temp log file: {}", tempFilePath);
-                }
+                ctx.sendDocument(
+                        String.format("📄 <b>Logs for</b> <code>%s</code> (Last %d lines)",
+                                name,
+                                lines),
+                        tempFilePath.toFile()
+                );
+                Files.deleteIfExists(tempFilePath);
             } catch (Exception e) {
                 log.error("Failed to generate temp file", e);
                 ctx.reply("❌ Failed to generate the log file.");
             }
         } else {
-            if (logs.length() > 3800) {
-                logs = logs.substring(logs.length() - 3800) + "\n\n[Truncated...]";
-            }
-            ctx.reply("📄 <b>Logs for</b> <code>" + containerName +
-                    "</code> (Last " + lines + " lines):\n<pre>" + logs + "</pre>");
+            if (logs.length() > 3800) logs = logs.substring(logs.length() - 3800) + "\n\n[Truncated...]";
+            ctx.reply(String.format(
+                    "📄 <b>Logs for</b> <code>%s</code> (Last %d lines):\n<pre>%s</pre>",
+                    name, lines, logs)
+            );
+        }
+    }
+
+    private int parseLinesArg(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return 20;
         }
     }
 }

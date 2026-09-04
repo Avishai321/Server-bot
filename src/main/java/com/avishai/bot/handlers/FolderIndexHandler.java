@@ -1,13 +1,13 @@
 package com.avishai.bot.handlers;
 
-import com.avishai.bot.core.CommandContext;
 import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.core.CommandContext;
+import com.avishai.bot.services.NextcloudService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,36 +16,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 @Slf4j
 @RequiredArgsConstructor
 public class FolderIndexHandler implements CommandHandler {
-    private static final String ROOT_PATH_STR = "/mnt/d/data";
-    private static final Path ROOT_PATH = Paths.get(ROOT_PATH_STR);
+    private static final Path ROOT_PATH = Paths.get(NextcloudService.ROOT_PATH_STR);
     private static final Path BOUNDARY_PATH = Paths.get("/mnt/d");
-
     private final ExecutorService executorService;
+    private final NextcloudService nextcloudService;
     private final Map<String, Path> pathCache = new ConcurrentHashMap<>();
-
-    private final AtomicBoolean isIndexing = new AtomicBoolean(false);
-    private volatile Process currentProcess = null;
-
-    private static String getOccCommand(Path targetPath) {
-        String targetStr = targetPath.toAbsolutePath().toString();
-
-        if (targetStr.equals(ROOT_PATH_STR) || !targetStr.startsWith(ROOT_PATH_STR)) {
-            return "php occ files:scan --all";
-        }
-
-        String relativePath = targetStr.substring(ROOT_PATH_STR.length());
-        if (relativePath.startsWith("/")) {
-            relativePath = relativePath.substring(1);
-        }
-
-        return "php occ files:scan --path=\"" + relativePath + "\"";
-    }
 
     @Override
     public List<String> getCommandSignature() {
@@ -54,8 +34,8 @@ public class FolderIndexHandler implements CommandHandler {
 
     @Override
     public void handle(CommandContext ctx) {
-        String action = extractCommand(ctx);
-        Integer msgId = extractMessageId(ctx);
+        String action = ctx.getActionData();
+        Integer msgId = ctx.getMessageId();
 
         if (action.equals(BotCommands.INDEX_FOLDER)) {
             sendDirectoryMenu(ctx, ROOT_PATH, msgId);
@@ -99,7 +79,6 @@ public class FolderIndexHandler implements CommandHandler {
                     .toList();
 
             List<InlineKeyboardButton> currentRow = new ArrayList<>();
-
             for (Path subDir : subDirs) {
                 currentRow.add(createButton(
                         "📁 " + subDir.getFileName(),
@@ -120,140 +99,96 @@ public class FolderIndexHandler implements CommandHandler {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(rows);
 
-        String uiTemplate = """
+        String text = String.format("""
                 📂 <b>Server Index Explorer</b>
                 <b>Location:</b> <code>%s</code>
                 
-                Navigate or execute sync:""";
-
-        String text = String.format(uiTemplate, validDir.toAbsolutePath());
+                Navigate or execute sync:""", validDir.toAbsolutePath());
 
         if (messageId != null) ctx.edit(messageId, text, markup);
         else ctx.reply(text, markup);
     }
 
     private void startIndexingProcess(CommandContext ctx, Path targetPath, Integer messageId) {
-        if (!isIndexing.compareAndSet(false, true)) {
-            ctx.edit(
-                    messageId,
-                    "⚠️ <b>Action Denied:</b> Another bot indexing task is currently running."
-            );
+        if (nextcloudService.isBusy()) {
+            ctx.edit(messageId,
+                    "⚠️ <b>Action Denied:</b> Another bot indexing task is currently running.");
             return;
         }
 
         long startTime = System.currentTimeMillis();
-        String initUi = """
+        ctx.edit(messageId, String.format("""
                 ⚙️ <b>Nextcloud Indexing Started...</b>
-                <b>Target:</b> <code>%s</code>""";
-        ctx.edit(messageId, String.format(initUi, targetPath.toAbsolutePath()), getStopKeyboard());
+                <b>Target:</b> <code>%s</code>""", targetPath.toAbsolutePath()), getStopKeyboard());
 
+        // Launch UI updater timer
+        NextcloudService.NextcloudSyncResult result;
         try (ScheduledExecutorService uiScheduler = Executors.newSingleThreadScheduledExecutor()) {
-            try {
-                String occCommand = getOccCommand(targetPath);
-                List<String> command = List.of(
-                        "docker", "exec", "--user", "www-data",
-                        "nextcloud-server-app-1", "bash", "-c", occCommand
-                );
+            uiScheduler.scheduleAtFixedRate(() -> {
+                long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+                ctx.edit(messageId,
+                        String.format("""
+                                        ⚙️ <b>Syncing Nextcloud Database...</b>
+                                        <b>Target:</b> <code>%s</code>
+                                        
+                                        ⏱ <b>Elapsed Time:</b> %ds
+                                        <i>Scanning files in background...</i>""",
+                                targetPath.toAbsolutePath(), elapsed),
+                        getStopKeyboard());
+            }, 1, 1, TimeUnit.SECONDS);
 
-                ProcessBuilder pb = new ProcessBuilder(command);
-                pb.redirectErrorStream(true);
-                currentProcess = pb.start();
+            // Block thread, run the business logic service
+            result = nextcloudService.runOccScan(targetPath);
 
-                uiScheduler.scheduleAtFixedRate(() -> {
-                    long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-                    String liveUi = """
-                            ⚙️ <b>Syncing Nextcloud Database...</b>
-                            <b>Target:</b> <code>%s</code>
-                            
-                            ⏱ <b>Elapsed Time:</b> %ds
-                            <i>Scanning files in background...</i>""";
-
-                    ctx.edit(
-                            messageId,
-                            String.format(liveUi, targetPath.toAbsolutePath(), elapsed),
-                            getStopKeyboard()
-                    );
-                }, 1, 1, TimeUnit.SECONDS);
-
-                // Block and wait for the process to finish, reading all output at once
-                String rawOutput = new String(
-                        currentProcess.getInputStream().readAllBytes(),
-                        StandardCharsets.UTF_8
-                );
-
-                int exitCode = currentProcess.waitFor();
-                String finalOutput = rawOutput.replaceAll("\u001B\\[[;\\d]*m", "").trim();
-
-                renderFinalState(ctx, messageId, targetPath, exitCode, finalOutput);
-
-            } catch (Exception e) {
-                log.error("Indexing process failed", e);
-                ctx.edit(messageId, "❌ <b>Process Crashed</b>\n<pre>" + escapeHtml(e.getMessage()) + "</pre>");
-            } finally {
-                uiScheduler.shutdownNow(); // Gracefully stops the 1-second timer
-                currentProcess = null;
-                isIndexing.set(false);
-            }
+            // Cleanup UI timer and render result
+            uiScheduler.shutdownNow();
         }
+        renderFinalState(ctx, messageId, targetPath, result);
     }
 
     private void renderFinalState(
             CommandContext ctx,
             Integer messageId,
             Path targetPath,
-            int exitCode,
-            String finalOutput) {
-
-        if (finalOutput.contains("Another process is already scanning")) {
-            String busyUi = """
-                    ⚠️ <b>Server Busy</b>
-                    <b>Target:</b> <code>%s</code>
-                    
-                    Nextcloud is currently indexing this folder in the background (likely from a previous run).
-                    Please wait a few minutes before trying again.""";
-            ctx.edit(messageId, String.format(busyUi, targetPath.toAbsolutePath()), null);
+            NextcloudService.NextcloudSyncResult result
+    ) {
+        if (result.output().contains("Another process is already scanning")) {
+            ctx.edit(messageId, String.format("""
+                            ⚠️ <b>Server Busy</b>
+                            <b>Target:</b> <code>%s</code>
+                            
+                            Nextcloud is currently indexing this folder in the background (likely from a previous run).
+                            Please wait a few minutes before trying again.""",
+                    targetPath.toAbsolutePath()));
             return;
         }
 
-        if (exitCode == 137 || exitCode == 143) {
-            String abortedUi = """
+        if (result.exitCode() == 137 || result.exitCode() == 143) {
+            ctx.edit(messageId, String.format("""
                     🛑 <b>Indexing Aborted by User</b>
-                    <b>Target:</b> <code>%s</code>""";
-            ctx.edit(messageId, String.format(abortedUi, targetPath.toAbsolutePath()), null);
+                    <b>Target:</b> <code>%s</code>""", targetPath.toAbsolutePath()));
             return;
         }
 
-        String title = (exitCode == 0)
+        String title = (result.exitCode() == 0)
                 ? "✅ <b>Indexing Completed</b>"
-                : "❌ <b>Indexing Failed (Code: " + exitCode + ")</b>";
+                : "❌ <b>Indexing Failed (Code: " + result.exitCode() + ")";
 
-        String completeUi = """
-                %s
-                <b>Target:</b> <code>%s</code>
-                
-                <b>Final Output:</b>
-                <pre>%s</pre>""";
-
-        ctx.edit(messageId,
-                String.format(completeUi, title, targetPath.toAbsolutePath(), escapeHtml(finalOutput)),
-                null);
+        ctx.edit(messageId, String.format("""
+                        %s
+                        <b>Target:</b> <code>%s</code>
+                        
+                        <b>Final Output:</b>
+                        <pre>%s</pre>""",
+                title, targetPath.toAbsolutePath(), escapeHtml(result.output())));
     }
 
     private void abortIndexingProcess(CommandContext ctx, Integer messageId) {
-        if (isIndexing.get() && currentProcess != null) {
-            ctx.edit(messageId, "⚠️ <i>Executing kill command in Nextcloud container...</i>");
-
-            try {
-                ProcessBuilder pb = new ProcessBuilder(
-                        "docker", "exec", "--user", "www-data",
-                        "nextcloud-server-app-1", "pkill", "-f", "occ files:scan"
-                );
-                pb.start().waitFor();
-
-                currentProcess.destroyForcibly();
-            } catch (Exception e) {
-                log.error("Failed to kill container process", e);
-            }
+        if (nextcloudService.isBusy()) {
+            ctx.edit(messageId,
+                    "⚠️ <i>Executing kill command in Nextcloud container...</i>"
+            );
+            nextcloudService.abortScan();
         } else {
             ctx.edit(messageId, "ℹ️ No indexing process is currently running.");
         }
@@ -261,8 +196,9 @@ public class FolderIndexHandler implements CommandHandler {
 
     private InlineKeyboardMarkup getStopKeyboard() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(List.of(List.of(
-                createButton("🛑 Stop Indexing", "/idx_stop")
+        markup.setKeyboard(List.of(List.of(createButton(
+                "🛑 Stop Indexing",
+                "/idx_stop")
         )));
         return markup;
     }
@@ -270,7 +206,6 @@ public class FolderIndexHandler implements CommandHandler {
     private String registerPath(Path path) {
         String id = UUID.randomUUID().toString().substring(0, 8);
         if (pathCache.size() > 500) pathCache.clear();
-
         pathCache.put(id, path);
         return id;
     }
@@ -280,23 +215,6 @@ public class FolderIndexHandler implements CommandHandler {
         btn.setText(text);
         btn.setCallbackData(callbackData);
         return btn;
-    }
-
-    private String extractCommand(CommandContext ctx) {
-        if (ctx.update().hasCallbackQuery()) {
-            return ctx.update().getCallbackQuery().getData();
-        }
-        if (ctx.update().hasMessage() && ctx.update().getMessage().hasText()) {
-            return ctx.update().getMessage().getText();
-        }
-        return "";
-    }
-
-    private Integer extractMessageId(CommandContext ctx) {
-        if (ctx.update().hasCallbackQuery()) {
-            return ctx.update().getCallbackQuery().getMessage().getMessageId();
-        }
-        return null;
     }
 
     private String escapeHtml(String text) {

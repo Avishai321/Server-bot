@@ -1,10 +1,14 @@
 package com.avishai.bot.core;
 
+import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.config.Config;
 import com.avishai.bot.handlers.*;
 import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.scheduler.tasks.SpotifyDailySyncTask;
-import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.services.DockerService;
+import com.avishai.bot.services.NextcloudService;
+import com.avishai.bot.services.SpotifyService;
+import com.avishai.bot.services.SystemService;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
@@ -27,35 +31,40 @@ public class BotApplication {
         CoreBot bot = new CoreBot(Config.BOT_USERNAME, Config.BOT_TOKEN);
         bot.setUpdateRouter(router);
 
-        // Centralized Global Thread Pool
+        // Thread Pools
         ExecutorService globalExecutor = Executors.newCachedThreadPool();
 
-        SpotiSyncHandler spotiSyncHandler = new SpotiSyncHandler(globalExecutor);
+        // Initialize Services
+        SpotifyService spotifyService = new SpotifyService();
+        DockerService dockerService = new DockerService();
+        SystemService systemService = new SystemService();
+        NextcloudService nextcloudService = new NextcloudService();
+
+        // Initialize Handlers (Controllers)
         List<CommandHandler> handlers = List.of(
-                spotiSyncHandler,
-                new UpdateBotHandler(globalExecutor),
-                new DockerManagerHandler(globalExecutor),
-                new SysInfoHandler(globalExecutor),
-                new FolderIndexHandler(globalExecutor),
+                new SpotiSyncHandler(globalExecutor, spotifyService),
+                new UpdateBotHandler(globalExecutor, systemService),
+                new DockerManagerHandler(globalExecutor, dockerService),
+                new SysInfoHandler(globalExecutor, systemService),
+                new FolderIndexHandler(globalExecutor, nextcloudService),
                 new HelpHandler()
         );
-
         handlers.forEach(router::registerCommand);
 
+        // Initialize Scheduler
         TaskScheduler scheduler = new TaskScheduler();
-        scheduler.registerTask(new SpotifyDailySyncTask(spotiSyncHandler, bot));
+        scheduler.registerTask(new SpotifyDailySyncTask(spotifyService, bot));
 
         TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
         botsApi.registerBot(bot);
         log.info("Telegram Bot API successfully registered.");
 
         setupNativeMenu(bot);
-
         scheduler.startAll();
-        log.info("Scheduler framework successfully started.");
 
         bot.sendMessage(String.valueOf(Config.AUTHORIZED_CHAT_ID),
-                "🚀 <b>System Boot</b>\nHome Server Manager Daemon is online and ready.");
+                "🚀 <b>System Boot</b>\nHome Server Manager Daemon is online and ready."
+        );
     }
 
     private static void setupNativeMenu(CoreBot bot) {
