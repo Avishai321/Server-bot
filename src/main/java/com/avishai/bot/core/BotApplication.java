@@ -17,6 +17,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,23 +31,19 @@ public class BotApplication {
         CoreBot bot = new CoreBot(Config.BOT_USERNAME, Config.BOT_TOKEN);
         bot.setUpdateRouter(router);
 
-        // Thread Pools
         ExecutorService globalExecutor = Executors.newCachedThreadPool();
 
-        // Initialize Services
         SpotifyService spotifyService = new SpotifyService();
 
-        // Initialize and Register Handlers
         List<CommandHandler> handlers = buildHandlers(
                 globalExecutor,
-                spotifyService,
-                new DockerService(),
                 new SystemService(),
-                new NextcloudService()
+                spotifyService,
+                new NextcloudService(),
+                new DockerService()
         );
         handlers.forEach(router::registerCommand);
 
-        // Initialize Scheduler
         TaskScheduler scheduler = new TaskScheduler();
         scheduler.registerTask(new SpotifyDailySyncTask(spotifyService, bot));
 
@@ -64,10 +61,10 @@ public class BotApplication {
 
     private static List<CommandHandler> buildHandlers(
             ExecutorService executor,
-            SpotifyService spotifyService,
-            DockerService dockerService,
             SystemService systemService,
-            NextcloudService nextcloudService
+            SpotifyService spotifyService,
+            NextcloudService nextcloudService,
+            DockerService dockerService
     ) {
         List<CommandHandler> handlers = new ArrayList<>(List.of(
                 new SysInfoHandler(executor, systemService),
@@ -77,15 +74,15 @@ public class BotApplication {
                 new UpdateBotHandler(executor, systemService)
         ));
 
-        // HelpHandler requires the list of all other handlers to dynamically generate the menu
         handlers.addFirst(new HelpHandler(handlers));
-
         return handlers;
     }
 
     private static void setupNativeMenu(CoreBot bot, List<CommandHandler> handlers) {
         List<BotCommand> commands = handlers.stream()
                 .filter(h -> !h.getDescription().isEmpty())
+                // Sort by HandlerCategory enum order to guarantee predictability
+                .sorted(Comparator.comparing(CommandHandler::getCategory))
                 .map(h -> new BotCommand(
                         h.getCommandSignature().get(0),
                         h.getDescription()
