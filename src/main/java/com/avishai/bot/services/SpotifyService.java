@@ -14,14 +14,26 @@ import java.util.regex.Pattern;
 @Slf4j
 public class SpotifyService {
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
-    private final Pattern playlistMarkerPattern = Pattern.compile(
-            "PLAYLIST_MARKER:\\s*(\\d+)/(\\d+)\\s*-\\s*(.*)");
-    private final Pattern foundSongsPattern = Pattern.compile("(?i)Found (\\d+) songs");
-    private final Pattern downloadedPattern = Pattern.compile("(?i)Downloaded \"(.+)\"");
-    private final Pattern errorPattern = Pattern.compile("(?i)(failed to download|skipped|error:)");
-    private final Pattern searchingPattern = Pattern.compile("(?i)Searching for (.+)");
-    private final Pattern skippingPattern = Pattern.compile("(?i)Skipping (.+)");
+    // Strict regexes aligned with the new bash markers and spotdl logs
+    private final Pattern playlistPattern = Pattern.compile("^\\[BOT:PLAYLIST] (\\d+) (\\d+) (.*)");
+    private final Pattern phasePattern = Pattern.compile("^\\[BOT:PHASE] (.*)");
+    private final Pattern foundPattern = Pattern.compile("(?i)Found (\\d+) songs");
+    private final Pattern downloadedPattern = Pattern.compile("^Downloaded \"([^\"]+)\"");
+    private final Pattern skippedPattern = Pattern.compile("^Skipping (.*?) \\(file already exists\\)");
+    private final Pattern errorPattern = Pattern.compile(
+            "(?i)(AudioProviderError|FFmpegError|MetadataError|YT-DLP download error)"
+    );
     private volatile Process currentProcess = null;
+
+    public SpotifyService() {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (this.currentProcess != null) {
+                log.warn("JVM Shutting down: Force-killing Spotify Sync child processes...");
+                this.currentProcess.descendants().forEach(ProcessHandle::destroyForcibly);
+                this.currentProcess.destroyForcibly();
+            }
+        }));
+    }
 
     public boolean isBusy() {
         return isSyncing.get();
@@ -31,6 +43,7 @@ public class SpotifyService {
         if (!isSyncing.compareAndSet(false, true)) return;
 
         SpotiSyncState state = new SpotiSyncState();
+
         try {
             ProcessBuilder pb = new ProcessBuilder("bash", Config.SPOTIFY_BACKUP_SCRIPT_PATH);
             pb.redirectErrorStream(true);
@@ -52,23 +65,26 @@ public class SpotifyService {
             }
 
             int exitCode = currentProcess.waitFor();
+
             if (exitCode == 137 || exitCode == 143) {
                 state.globalStatus = "Aborted 🛑";
-                state.currentTrackName = "Process killed by user.";
-            } else if (exitCode == 0) {
+                state.currentTrackName = "Process forcibly terminated by user.";
+            } else {
                 state.globalStatus = "Completed ✅";
-                state.currentTrackName = "All tracks finished smoothly.";
-                if (state.tracksInCurrentPlaylist > 0) state.tracksProcessedInCurrent = state.tracksInCurrentPlaylist;
-            } else state.globalStatus = "Failed ❌ (Code: " + exitCode + ")";
-
-            onStateUpdate.accept(state);
+                state.currentTrackName = "All tasks finished.";
+                if (state.tracksInCurrentPlaylist > 0) {
+                    state.tracksProcessedInCurrent = state.tracksInCurrentPlaylist;
+                }
+            }
 
         } catch (Exception e) {
-            log.error("Execution error", e);
-            state.globalStatus = "Critical Error";
+            log.error("Spotify execution error", e);
+            state.globalStatus = "Critical Error ❌";
             state.currentTrackName = e.getMessage();
-            onStateUpdate.accept(state);
         } finally {
+            state.setActive(false);
+            onStateUpdate.accept(state);
+
             currentProcess = null;
             isSyncing.set(false);
         }
@@ -83,7 +99,7 @@ public class SpotifyService {
     }
 
     private boolean parseLineAndUpdateState(String line, SpotiSyncState state) {
-        Matcher playlistMatcher = playlistMarkerPattern.matcher(line);
+        Matcher playlistMatcher = playlistPattern.matcher(line);
         if (playlistMatcher.find()) {
             state.currentPlaylistNum = Integer.parseInt(playlistMatcher.group(1));
             state.totalPlaylists = Integer.parseInt(playlistMatcher.group(2));
@@ -93,39 +109,43 @@ public class SpotifyService {
             state.currentTrackName = "Scanning Spotify...";
             return true;
         }
-        Matcher foundMatcher = foundSongsPattern.matcher(line);
+
+        Matcher phaseMatcher = phasePattern.matcher(line);
+        if (phaseMatcher.find()) {
+            state.globalStatus = phaseMatcher.group(1) + " ⚙️";
+            state.currentTrackName = "Processing...";
+            return true;
+        }
+
+        Matcher foundMatcher = foundPattern.matcher(line);
         if (foundMatcher.find()) {
             state.tracksInCurrentPlaylist = Integer.parseInt(foundMatcher.group(1));
             return true;
         }
+
         Matcher downMatcher = downloadedPattern.matcher(line);
         if (downMatcher.find()) {
             state.tracksProcessedInCurrent++;
             state.globalDownloaded++;
-            state.currentTrackName = "✅ Downloaded: " + downMatcher.group(1);
+            state.currentTrackName = downMatcher.group(1);
             return true;
         }
-        Matcher skipMatcher = skippingPattern.matcher(line);
+
+        Matcher skipMatcher = skippedPattern.matcher(line);
         if (skipMatcher.find()) {
             state.tracksProcessedInCurrent++;
-            state.currentTrackName = "⏭️ Skipped: " + skipMatcher.group(1);
+            state.globalSkipped++;
+            state.currentTrackName = skipMatcher.group(1);
             return true;
         }
-        Matcher searchMatcher = searchingPattern.matcher(line);
-        if (searchMatcher.find()) {
-            state.currentTrackName = "🔍 Matching: " + searchMatcher.group(1);
-            return true;
-        }
+
         Matcher errMatcher = errorPattern.matcher(line);
         if (errMatcher.find()) {
             state.globalFailed++;
+            state.currentTrackName = "Error: " + errMatcher.group(1);
             return true;
         }
-        if (line.toLowerCase().contains("scanning files into nextcloud database")) {
-            state.globalStatus = "Updating Nextcloud ⚙️";
-            state.currentTrackName = "Database Sync...";
-            return true;
-        }
+
         return false;
     }
 }

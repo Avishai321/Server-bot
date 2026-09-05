@@ -1,8 +1,11 @@
 package com.avishai.bot.scheduler.tasks;
 
+import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.core.MessageSender;
+import com.avishai.bot.core.TelegramUi;
 import com.avishai.bot.scheduler.TelegramScheduledTask;
 import com.avishai.bot.services.SpotifyService;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -42,20 +45,24 @@ public class SpotifyDailySyncTask extends TelegramScheduledTask {
 
         notifyAdmin("🔄 <b>Automated System Event</b>\nInitiating scheduled 3:00 AM Spotify Sync...");
 
-        // 1. Send the initial UI card and grab the message ID
         Integer messageId = messageSender.sendMessage(
                 adminChatId,
                 """
                         🎵 <b>TASK:</b> Spotify Music Sync
-                        <b>STATUS:</b> Initializing...
-                        <b>Track:</b> <i>Connecting...</i>"""
+                        
+                        🚀 <b>STATUS:</b> Initializing...
+                        🎧 <b>Track:</b> <i>Connecting...</i>""",
+                TelegramUi.singleButtonKeyboard("🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
         );
 
-        // 2. Feed the UI update logic into the service so it streams live to Telegram
-        if (messageId != null) spotifyService.runSync(state ->
-                messageSender.editMessage(adminChatId, messageId, state.renderCard())
-        );
-        else spotifyService.runSync(state -> {
+        if (messageId != null) {
+            spotifyService.runSync(state -> {
+                InlineKeyboardMarkup keyboard = state.isActive()
+                        ? TelegramUi.singleButtonKeyboard("🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
+                        : null;
+                messageSender.editMessage(adminChatId, messageId, state.renderCard(), keyboard);
+            });
+        } else spotifyService.runSync(state -> {
         });
     }
 }

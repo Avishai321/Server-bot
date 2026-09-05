@@ -7,6 +7,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class SpotiSyncState {
+    public boolean isActive = true;
     public int currentPlaylistNum = 0;
     public int totalPlaylists = 0;
     public String currentPlaylistName = "Initializing...";
@@ -15,6 +16,7 @@ public class SpotiSyncState {
     public String currentTrackName = "Waking up process...";
     public int globalDownloaded = 0;
     public int globalFailed = 0;
+    public int globalSkipped = 0;
     public String globalStatus = "Running ⚙️";
 
     public String renderCard() {
@@ -39,12 +41,12 @@ public class SpotiSyncState {
                 🚀 <b>STATUS:</b> %s
                 %s🎧 <b>Track:</b> <i>%s</i>
                 
-                💾 Total saved: %d
-                ⏭️ Skipped/Failed: %d""",
+                ✅ Downloaded: %d  |  ⏭️ Skipped: %d  |  ❌ Failed: %d""",
                 globalStatus,
                 playlistInfo,
                 TelegramUi.escapeHtml(currentTrackName),
                 globalDownloaded,
+                globalSkipped,
                 globalFailed);
     }
 }
