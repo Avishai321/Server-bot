@@ -69,7 +69,7 @@ public class SpotiSyncState {
                   <b>STATUS:</b> %s
                 %s  <b>Track:</b> <i>%s</i>
                  \s
-                  Downloaded: %d  |    Skipped: %d  |    Failed: %d""",
+                  Downloaded: %d  | Skipped: %d  | Failed: %d""",
                 globalStatus.get(),
                 playlistInfo,
                 TelegramUi.escapeHtml(currentTrackName.get()),
