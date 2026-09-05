@@ -33,13 +33,14 @@ public class BotApplication {
 
         ExecutorService globalExecutor = Executors.newCachedThreadPool();
 
-        SpotifyService spotifyService = new SpotifyService();
+        NextcloudService nextcloudService = new NextcloudService();
+        SpotifyService spotifyService = new SpotifyService(nextcloudService);
 
         List<CommandHandler> handlers = buildHandlers(
                 globalExecutor,
                 new SystemService(),
                 spotifyService,
-                new NextcloudService(),
+                nextcloudService,
                 new DockerService()
         );
         handlers.forEach(router::registerCommand);

@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class NextcloudService {
-    public static final String ROOT_PATH_STR = "/mnt/d/data";
+    public static final String ROOT_PATH_STR = "/mnt/d/data/Avishai/files";
 
     private final AtomicBoolean isIndexing = new AtomicBoolean(false);
     private volatile Process currentProcess = null;
