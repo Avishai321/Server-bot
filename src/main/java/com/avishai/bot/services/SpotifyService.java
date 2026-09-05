@@ -14,15 +14,20 @@ import java.util.regex.Pattern;
 @Slf4j
 public class SpotifyService {
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
-    // Strict regexes aligned with the new bash markers and spotdl logs
-    private final Pattern playlistPattern = Pattern.compile("^\\[BOT:PLAYLIST] (\\d+) (\\d+) (.*)");
-    private final Pattern phasePattern = Pattern.compile("^\\[BOT:PHASE] (.*)");
-    private final Pattern foundPattern = Pattern.compile("(?i)Found (\\d+) songs");
-    private final Pattern downloadedPattern = Pattern.compile("^Downloaded \"([^\"]+)\"");
-    private final Pattern skippedPattern = Pattern.compile("^Skipping (.*?) \\(file already exists\\)");
+    private final Pattern playlistPattern = Pattern.compile(
+            "^\\[BOT:PLAYLIST] (\\d+) (\\d+) (.*)");
+    private final Pattern phasePattern = Pattern.compile(
+            "^\\[BOT:PHASE] (.*)");
+    private final Pattern foundPattern = Pattern.compile(
+            "(?i)Found (\\d+) songs");
+    private final Pattern downloadedPattern = Pattern.compile(
+            "(?i)Downloaded \"([^\"]+)\"");
+    private final Pattern skippedPattern = Pattern.compile(
+            "(?i)Skipping (.*?)(?: \\(file already exists\\))?(?: \\(duplicate\\))?$");
+    private final Pattern lookupErrorPattern = Pattern.compile(
+            "(?i)LookupError: (.*)");
     private final Pattern errorPattern = Pattern.compile(
-            "(?i)(AudioProviderError|FFmpegError|MetadataError|YT-DLP download error)"
-    );
+            "(?i)(AudioProviderError|FFmpegError|MetadataError|YT-DLP download error)");
     private volatile Process currentProcess = null;
 
     public SpotifyService() {
@@ -135,7 +140,15 @@ public class SpotifyService {
         if (skipMatcher.find()) {
             state.tracksProcessedInCurrent++;
             state.globalSkipped++;
-            state.currentTrackName = skipMatcher.group(1);
+            state.currentTrackName = skipMatcher.group(1).trim();
+            return true;
+        }
+
+        Matcher lookupErrMatcher = lookupErrorPattern.matcher(line);
+        if (lookupErrMatcher.find()) {
+            state.tracksProcessedInCurrent++;
+            state.globalFailed++;
+            state.currentTrackName = "Not Found: " + lookupErrMatcher.group(1).trim();
             return true;
         }
 
