@@ -2,28 +2,31 @@
     <!-- Standard Console Output (For systemd journal) -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <!--
+              No date pattern here. Systemd provides the timestamp.
+              [%thread]  -> Keeps the thread name
+              %-5level   -> Aligns INFO/WARN/ERROR
+              %logger{0} -> Shortens com.avishai...SpotifyService to just SpotifyService
+            -->
+            <pattern>[%thread] %-5level %logger{0} - %msg%n</pattern>
         </encoder>
     </appender>
 
     <!-- Daily Rolling File Output -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!-- The active log file -->
         <file>logs/homebot.log</file>
 
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <!-- Daily rollover: When the day ends, rename it and start a new one -->
             <fileNamePattern>logs/archive/homebot.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <!-- Keep 30 days of history to save disk space -->
             <maxHistory>30</maxHistory>
         </rollingPolicy>
 
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <!-- File gets the custom MM/dd HH:mm:ss format -->
+            <pattern>%d{MM/dd HH:mm:ss} [%thread] %-5level %logger{0} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <!-- Apply both appenders to the root logger -->
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="FILE"/>
