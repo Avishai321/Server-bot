@@ -27,6 +27,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Base64.getDecoder;
+
 @Slf4j
 public class SpotifyService {
     private static final Pattern PLAYLIST_ID_PATTERN = Pattern.compile("playlist/([a-zA-Z0-9]+)");
@@ -102,7 +104,8 @@ public class SpotifyService {
                 try {
                     Path musicRootPath = Paths.get(NextcloudService.ROOT_PATH_STR, "Avishai/files/Music");
                     var scanResult = nextcloudService.runOccScan(musicRootPath);
-                    log.info("Nextcloud auto-index finished with exit code {}: {}", scanResult.exitCode(), scanResult.output());
+                    log.info("Nextcloud auto-index finished with exit code {}: {}",
+                            scanResult.exitCode(), scanResult.output());
                 } catch (Exception e) {
                     log.error("Failed to execute automatic Nextcloud index scan after Spotify sync", e);
                 }
@@ -111,11 +114,15 @@ public class SpotifyService {
     }
 
     @SneakyThrows
-    private void processPlaylist(Config.SpotifyTarget target, SpotiSyncState state, Consumer<SpotiSyncState> onUiUpdate) {
+    private void processPlaylist(
+            Config.SpotifyTarget target,
+            SpotiSyncState state,
+            Consumer<SpotiSyncState> onUiUpdate
+    ) {
         String playlistId = extractPlaylistId(target.link());
-        if (playlistId.isEmpty()) {
-            throw new IllegalArgumentException("Invalid Spotify link configured for folder: " + target.folderName());
-        }
+        if (playlistId.isEmpty()) throw new IllegalArgumentException(
+                "Invalid Spotify link configured for folder: " + target.folderName()
+        );
 
         String url = "https://open.spotify.com/embed/playlist/" + playlistId;
         var request = HttpRequest.newBuilder()
@@ -133,7 +140,8 @@ public class SpotifyService {
         String html = response.body();
         String jsonPayload = extractJsonPayload(html);
         if (jsonPayload == null) {
-            throw new IllegalStateException("Regex failed: Could not locate JSON metadata inside the HTML. Ensure the playlist is public.");
+            throw new IllegalStateException("Regex failed: Could not locate JSON metadata inside the HTML." +
+                    " Ensure the playlist is public.");
         }
 
         JsonNode root = mapper.readTree(jsonPayload);
@@ -150,9 +158,9 @@ public class SpotifyService {
         var uniqueTracks = allTracks.stream().distinct().toList();
         log.info("[{}] Extracted {} unique tracks from HTML.", target.folderName(), uniqueTracks.size());
 
-        if (uniqueTracks.isEmpty()) {
-            throw new IllegalStateException("JSON Parser found 0 tracks. The link might be broken or the playlist is empty.");
-        }
+        if (uniqueTracks.isEmpty()) throw new IllegalStateException(
+                "JSON Parser found 0 tracks. The link might be broken or the playlist is empty."
+        );
 
         var existingFiles = getExistingFiles(targetDir);
         List<SpotifyResponses.Track> missingTracks = new ArrayList<>();
@@ -174,7 +182,9 @@ public class SpotifyService {
         broadcastState(state, onUiUpdate, true);
 
         List<CompletableFuture<Void>> tasks = missingTracks.stream()
-                .map(track -> CompletableFuture.runAsync(() -> downloadTrack(track, targetDir, state, onUiUpdate), downloadPool))
+                .map(track -> CompletableFuture.runAsync(
+                        () -> downloadTrack(track, targetDir, state, onUiUpdate), downloadPool)
+                )
                 .toList();
 
         try {
@@ -195,11 +205,17 @@ public class SpotifyService {
     }
 
     private String extractJsonPayload(String html) {
-        var nextData = Pattern.compile("<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>").matcher(html);
+        var nextData = Pattern.compile(
+                        "<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>"
+                )
+                .matcher(html);
         if (nextData.find()) return nextData.group(1);
 
-        var initialState = Pattern.compile("<script id=\"initial-state\" type=\"text/plain\">(.*?)</script>").matcher(html);
-        if (initialState.find()) return new String(java.util.Base64.getDecoder().decode(initialState.group(1)));
+        var initialState = Pattern.compile(
+                "<script id=\"initial-state\" type=\"text/plain\">(.*?)</script>"
+        ).matcher(html);
+        if (initialState.find()) return new String(getDecoder()
+                .decode(initialState.group(1)));
 
         return null;
     }
@@ -207,18 +223,30 @@ public class SpotifyService {
     private void findTracksRecursively(JsonNode node, List<SpotifyResponses.Track> tracks) {
         if (node.isObject()) {
             // Schema 1: Standard Format
-            if (node.has("type") && "track".equals(node.get("type").asText()) && node.has("name") && node.has("artists")) {
+            if (node.has("type") &&
+                    "track".equals(node.get("type").asText()) &&
+                    node.has("name") &&
+                    node.has("artists")
+            ) {
                 String name = node.get("name").asText();
                 List<SpotifyResponses.Artist> artists = new ArrayList<>();
                 node.get("artists").forEach(a -> {
-                    if (a.has("name")) artists.add(new SpotifyResponses.Artist(a.get("name").asText()));
+                    if (a.has("name")) {
+                        artists.add(new SpotifyResponses.Artist(a.get("name").asText()));
+                    }
                 });
 
                 SpotifyResponses.Album albumObj = null;
                 if (node.has("album")) {
                     JsonNode albumNode = node.get("album");
-                    String albumName = albumNode.has("name") ? albumNode.get("name").asText() : "";
-                    String releaseDate = albumNode.has("release_date") ? albumNode.get("release_date").asText() : "";
+
+                    String albumName = albumNode.has("name")
+                            ? albumNode.get("name").asText()
+                            : "";
+
+                    String releaseDate = albumNode.has("release_date")
+                            ? albumNode.get("release_date").asText()
+                            : "";
                     albumObj = new SpotifyResponses.Album(albumName, releaseDate);
                 }
 
@@ -226,10 +254,17 @@ public class SpotifyService {
                 return;
             }
             // Schema 2: Embed Widget Fallback
-            else if (node.has("title") && node.has("subtitle") && node.has("uri") && node.get("uri").asText().contains("track")) {
+            else if (node.has("title") &&
+                    node.has("subtitle") &&
+                    node.has("uri") &&
+                    node.get("uri").asText().contains("track")
+            ) {
                 String name = node.get("title").asText();
                 String artist = node.get("subtitle").asText();
-                tracks.add(new SpotifyResponses.Track(name, List.of(new SpotifyResponses.Artist(artist)), null));
+                tracks.add(new SpotifyResponses.Track(
+                        name,
+                        List.of(new SpotifyResponses.Artist(artist)), null)
+                );
                 return;
             }
         }
@@ -240,28 +275,26 @@ public class SpotifyService {
     }
 
     @SneakyThrows
-    private void downloadTrack(SpotifyResponses.Track track, Path targetDir, SpotiSyncState state, Consumer<SpotiSyncState> onUiUpdate) {
+    private void downloadTrack(
+            SpotifyResponses.Track track,
+            Path targetDir,
+            SpotiSyncState state,
+            Consumer<SpotiSyncState> onUiUpdate
+    ) {
         if (abortFlag.get()) return;
 
-        var artist = track.artists().isEmpty() ? "Unknown" : track.artists().get(0).name().replace("\"", "");
+        var artist = track.artists().isEmpty()
+                ? "Unknown"
+                : track.artists()
+                .get(0)
+                .name()
+                .replace("\"", "");
+
         var title = track.name().replace("\"", "");
         var outputPath = targetDir.resolve(generateSafeFileName(track) + ".m4a");
 
         // Metadata extraction
-        var albumName = (track.album() != null && track.album().name() != null && !track.album().name().isEmpty())
-                ? track.album().name().replace("\"", "")
-                : title; // Fallback album to the single title if Spotify doesn't provide one
-
-        var releaseYear = "";
-        if (track.album() != null && track.album().releaseDate() != null && track.album().releaseDate().length() >= 4) {
-            releaseYear = track.album().releaseDate().substring(0, 4);
-        }
-
-        // Build exact ffmpeg metadata string
-        String ffmpegArgs = String.format("ffmpeg:-metadata title=\"%s\" -metadata artist=\"%s\" -metadata album=\"%s\"", title, artist, albumName);
-        if (!releaseYear.isEmpty()) {
-            ffmpegArgs += String.format(" -metadata date=\"%s\"", releaseYear);
-        }
+        String ffmpegArgs = metadataExtraction(track, title, artist);
 
         // Strict search using literal quotes
         String searchQuery = String.format("ytsearch1:\"%s\" \"%s\" audio", artist, title);
@@ -288,11 +321,12 @@ public class SpotifyService {
             int exitCode = process.waitFor();
             activeProcesses.remove(process);
 
-            if (exitCode == 0) {
-                state.markTrackSuccess(title);
-            } else if (!abortFlag.get()) {
+            if (exitCode == 0) state.markTrackSuccess(title);
+            else if (!abortFlag.get()) {
                 String errorDetails = Files.readString(errorLog);
-                log.error("[yt-dlp] Failed for '{} - {}'. Exit Code: {}\nError Output:\n{}", artist, title, exitCode, errorDetails.trim());
+                log.error("[yt-dlp] Failed for '{} - {}'. Exit Code: {}\nError Output:\n{}",
+                        artist, title, exitCode, errorDetails.trim()
+                );
                 state.markTrackFailed(title);
             }
         } catch (java.io.IOException e) {
@@ -302,6 +336,36 @@ public class SpotifyService {
             Files.deleteIfExists(errorLog);
             broadcastState(state, onUiUpdate, false);
         }
+    }
+
+    private boolean hasAlbumName(SpotifyResponses.Track track) {
+        return track.album() != null && track.album().name() != null && !track.album().name().isEmpty();
+    }
+
+    private boolean hasReleaseDate(SpotifyResponses.Track track) {
+        return track.album() != null &&
+                track.album().releaseDate() != null &&
+                track.album().releaseDate().length() >= 4;
+    }
+
+    private String metadataExtraction(SpotifyResponses.Track track, String title, String artist) {
+        String albumName = hasAlbumName(track)
+                ? track.album().name().replace("\"", "")
+                : title; // Fallback album to the single title if Spotify doesn't provide one
+
+        String releaseYear = "";
+        if (hasReleaseDate(track)) {
+            releaseYear = track.album().releaseDate().substring(0, 4);
+        }
+
+        // Build exact ffmpeg metadata string
+        String ffmpegArgs = String.format(
+                "ffmpeg:-metadata title=\"%s\" -metadata artist=\"%s\" -metadata album=\"%s\"",
+                title, artist, albumName
+        );
+
+        if (!releaseYear.isEmpty()) ffmpegArgs += String.format(" -metadata date=\"%s\"", releaseYear);
+        return ffmpegArgs;
     }
 
     @SneakyThrows
@@ -318,7 +382,11 @@ public class SpotifyService {
         return (artist + " - " + track.name()).replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
-    private void broadcastState(SpotiSyncState state, Consumer<SpotiSyncState> onUiUpdate, boolean force) {
+    private void broadcastState(
+            SpotiSyncState state,
+            Consumer<SpotiSyncState> onUiUpdate,
+            boolean force
+    ) {
         long now = System.currentTimeMillis();
         if (force || now - lastUiUpdateTime > Config.TELEGRAM_UPDATE_INTERVAL_MS) {
             onUiUpdate.accept(state);
