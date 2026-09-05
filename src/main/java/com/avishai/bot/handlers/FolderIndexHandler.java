@@ -68,18 +68,20 @@ public class FolderIndexHandler implements CommandHandler {
                 : ROOT_PATH;
 
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(List.of(TelegramUi.button(
+        InlineKeyboardButton indexButton = TelegramUi.button(
                 "✅ Index: " + validDir.getFileName(),
                 "/idx_run " + registerPath(validDir)
-        )));
+        );
 
         Path parent = validDir.getParent();
         if (parent != null && parent.startsWith(BOUNDARY_PATH)) {
-            rows.add(List.of(TelegramUi.button(
+            InlineKeyboardButton upButton = TelegramUi.button(
                     "🔙 Go Up to " + parent.getFileName(),
                     "/idx_nav " + registerPath(parent)
-            )));
-        }
+            );
+            rows.add(List.of(indexButton, upButton));
+        } else rows.add(List.of(indexButton));
+
 
         try (Stream<Path> paths = Files.list(validDir)) {
             List<Path> subDirs = paths
