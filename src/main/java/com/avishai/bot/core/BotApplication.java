@@ -70,15 +70,15 @@ public class BotApplication {
             NextcloudService nextcloudService
     ) {
         List<CommandHandler> handlers = new ArrayList<>(List.of(
-                new SpotiSyncHandler(executor, spotifyService),
-                new UpdateBotHandler(executor, systemService),
-                new DockerManagerHandler(executor, dockerService),
                 new SysInfoHandler(executor, systemService),
-                new FolderIndexHandler(executor, nextcloudService)
+                new SpotiSyncHandler(executor, spotifyService),
+                new FolderIndexHandler(executor, nextcloudService),
+                new DockerManagerHandler(executor, dockerService),
+                new UpdateBotHandler(executor, systemService)
         ));
 
         // HelpHandler requires the list of all other handlers to dynamically generate the menu
-        handlers.add(new HelpHandler(handlers));
+        handlers.addFirst(new HelpHandler(handlers));
 
         return handlers;
     }
