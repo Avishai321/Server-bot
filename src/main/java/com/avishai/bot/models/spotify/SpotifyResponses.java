@@ -6,7 +6,7 @@ import java.util.List;
 
 public class SpotifyResponses {
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Track(String name, List<Artist> artists, Album album) {}
+    public record Track(String name, List<Artist> artists, Album album, String coverUrl) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Artist(String name) {}

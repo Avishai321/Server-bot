@@ -9,9 +9,11 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,12 +33,18 @@ import static java.util.Base64.getDecoder;
 
 @Slf4j
 public class SpotifyService {
-    private static final Pattern PLAYLIST_ID_PATTERN = Pattern.compile("playlist/([a-zA-Z0-9]+)");
-    private final NextcloudService nextcloudService;
+    private static final Pattern PLAYLIST_ID_PATTERN =
+            Pattern.compile("playlist/([a-zA-Z0-9]+)");
+    private static final Pattern NEXT_DATA_PATTERN =
+            Pattern.compile("<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>");
+    private static final Pattern INITIAL_STATE_PATTERN =
+            Pattern.compile("<script id=\"initial-state\" type=\"text/plain\">(.*?)</script>");
+
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
     private final AtomicBoolean abortFlag = new AtomicBoolean(false);
     private final Set<Process> activeProcesses = ConcurrentHashMap.newKeySet();
 
+    private final NextcloudService nextcloudService;
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
     private final ExecutorService downloadPool;
@@ -44,9 +52,13 @@ public class SpotifyService {
 
     public SpotifyService(NextcloudService nextcloudService) {
         this.nextcloudService = nextcloudService;
-        this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
         this.mapper = new ObjectMapper();
         this.downloadPool = Executors.newFixedThreadPool(Config.SPOTIFY_DOWNLOAD_THREADS);
+
         Runtime.getRuntime().addShutdownHook(new Thread(this::abortSync));
     }
 
@@ -56,7 +68,7 @@ public class SpotifyService {
 
     public void abortSync() {
         if (isSyncing.get()) {
-            log.warn("Abort signal received! Terminating all active yt-dlp processes...");
+            log.warn("Abort signal received! Terminating active processes...");
             abortFlag.set(true);
             activeProcesses.forEach(Process::destroyForcibly);
         }
@@ -66,7 +78,7 @@ public class SpotifyService {
         if (!isSyncing.compareAndSet(false, true)) return;
 
         abortFlag.set(false);
-        var state = new SpotiSyncState();
+        SpotiSyncState state = new SpotiSyncState();
         state.setTotalPlaylists(Config.SPOTIFY_PLAYLISTS.size());
 
         try {
@@ -100,53 +112,29 @@ public class SpotifyService {
             isSyncing.set(false);
 
             if (!abortFlag.get() && "Completed".equals(state.getGlobalStatus().get())) {
-                log.info("Spotify sync completed. Triggering automatic Nextcloud index scan for music folder...");
-                try {
-                    Path musicRootPath = Paths.get(NextcloudService.ROOT_PATH_STR, "Avishai/files/Music");
-                    var scanResult = nextcloudService.runOccScan(musicRootPath);
-                    log.info("Nextcloud auto-index finished with exit code {}: {}",
-                            scanResult.exitCode(), scanResult.output());
-                } catch (Exception e) {
-                    log.error("Failed to execute automatic Nextcloud index scan after Spotify sync", e);
-                }
+                executeNextcloudScan();
             }
         }
     }
 
-    @SneakyThrows
-    private void processPlaylist(
-            Config.SpotifyTarget target,
-            SpotiSyncState state,
-            Consumer<SpotiSyncState> onUiUpdate
-    ) {
+    private void processPlaylist(Config.SpotifyTarget target,
+                                 SpotiSyncState state,
+                                 Consumer<SpotiSyncState> onUiUpdate) throws Exception {
+
         String playlistId = extractPlaylistId(target.link());
-        if (playlistId.isEmpty()) throw new IllegalArgumentException(
-                "Invalid Spotify link configured for folder: " + target.folderName()
-        );
-
-        String url = "https://open.spotify.com/embed/playlist/" + playlistId;
-        var request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                .header("Accept-Language", "en-US,en;q=0.9")
-                .build();
-
-        var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new IllegalStateException("Failed to load playlist HTML. HTTP " + response.statusCode());
+        if (playlistId.isEmpty()) {
+            throw new IllegalArgumentException("Invalid Spotify link for: " + target.folderName());
         }
 
-        String html = response.body();
+        String html = fetchPlaylistHtml(playlistId);
         String jsonPayload = extractJsonPayload(html);
+
         if (jsonPayload == null) {
-            throw new IllegalStateException("Regex failed: Could not locate JSON metadata inside the HTML." +
-                    " Ensure the playlist is public.");
+            throw new IllegalStateException("Could not locate JSON metadata inside the HTML.");
         }
 
         JsonNode root = mapper.readTree(jsonPayload);
-
-        var targetDir = Paths.get(Config.MUSIC_STORAGE_ROOT, target.folderName());
+        Path targetDir = Paths.get(Config.MUSIC_STORAGE_ROOT, target.folderName());
         Files.createDirectories(targetDir);
 
         state.setCurrentPlaylistName(target.folderName());
@@ -154,15 +142,14 @@ public class SpotifyService {
 
         List<SpotifyResponses.Track> allTracks = new ArrayList<>();
         findTracksRecursively(root, allTracks);
-
         var uniqueTracks = allTracks.stream().distinct().toList();
-        log.info("[{}] Extracted {} unique tracks from HTML.", target.folderName(), uniqueTracks.size());
+        log.info("[{}] Extracted {} unique tracks.", target.folderName(), uniqueTracks.size());
 
-        if (uniqueTracks.isEmpty()) throw new IllegalStateException(
-                "JSON Parser found 0 tracks. The link might be broken or the playlist is empty."
-        );
+        if (uniqueTracks.isEmpty()) {
+            throw new IllegalStateException("Parser found 0 tracks. Link may be broken.");
+        }
 
-        var existingFiles = getExistingFiles(targetDir);
+        Set<String> existingFiles = getExistingFiles(targetDir);
         List<SpotifyResponses.Track> missingTracks = new ArrayList<>();
 
         for (var track : uniqueTracks) {
@@ -174,7 +161,7 @@ public class SpotifyService {
             }
         }
 
-        log.info("[{}] Directory holds {} total files. {} missing tracks queued for download.",
+        log.info("[{}] Folder holds {} files. {} missing tracks queued.",
                 target.folderName(), existingFiles.size(), missingTracks.size());
 
         state.setTracksInCurrentPlaylist(missingTracks.size());
@@ -182,10 +169,9 @@ public class SpotifyService {
         broadcastState(state, onUiUpdate, true);
 
         List<CompletableFuture<Void>> tasks = missingTracks.stream()
-                .map(track -> CompletableFuture.runAsync(
-                        () -> downloadTrack(track, targetDir, state, onUiUpdate), downloadPool)
-                )
-                .toList();
+                .map(track -> CompletableFuture.runAsync(() ->
+                        downloadTrack(track, targetDir, state, onUiUpdate), downloadPool)
+                ).toList();
 
         try {
             CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0])).join();
@@ -195,76 +181,56 @@ public class SpotifyService {
         }
     }
 
+    private String fetchPlaylistHtml(String playlistId) throws Exception {
+        String url = "https://open.spotify.com/embed/playlist/" + playlistId;
+        var request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .GET()
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .build();
+
+        var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException("Failed to load HTML. HTTP " + response.statusCode());
+        }
+        return response.body();
+    }
+
     private String extractPlaylistId(String input) {
         if (input == null || input.isBlank()) return "";
         Matcher matcher = PLAYLIST_ID_PATTERN.matcher(input);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
+        if (matcher.find()) return matcher.group(1);
         return input.trim();
     }
 
     private String extractJsonPayload(String html) {
-        var nextData = Pattern.compile(
-                        "<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>"
-                )
-                .matcher(html);
+        Matcher nextData = NEXT_DATA_PATTERN.matcher(html);
         if (nextData.find()) return nextData.group(1);
 
-        var initialState = Pattern.compile(
-                "<script id=\"initial-state\" type=\"text/plain\">(.*?)</script>"
-        ).matcher(html);
-        if (initialState.find()) return new String(getDecoder()
-                .decode(initialState.group(1)));
+        Matcher initialState = INITIAL_STATE_PATTERN.matcher(html);
+        if (initialState.find()) return new String(getDecoder().decode(initialState.group(1)));
 
         return null;
     }
 
     private void findTracksRecursively(JsonNode node, List<SpotifyResponses.Track> tracks) {
         if (node.isObject()) {
-            // Schema 1: Standard Format
-            if (node.has("type") &&
-                    "track".equals(node.get("type").asText()) &&
-                    node.has("name") &&
-                    node.has("artists")
-            ) {
-                String name = node.get("name").asText();
-                List<SpotifyResponses.Artist> artists = new ArrayList<>();
-                node.get("artists").forEach(a -> {
-                    if (a.has("name")) {
-                        artists.add(new SpotifyResponses.Artist(a.get("name").asText()));
-                    }
-                });
+            boolean isStandardTrack = node.has("type")
+                    && "track".equals(node.get("type").asText())
+                    && node.has("name")
+                    && node.has("artists");
 
-                SpotifyResponses.Album albumObj = null;
-                if (node.has("album")) {
-                    JsonNode albumNode = node.get("album");
+            boolean isEmbedTrack = node.has("title")
+                    && node.has("subtitle")
+                    && node.has("uri")
+                    && node.get("uri").asText().contains("track");
 
-                    String albumName = albumNode.has("name")
-                            ? albumNode.get("name").asText()
-                            : "";
-
-                    String releaseDate = albumNode.has("release_date")
-                            ? albumNode.get("release_date").asText()
-                            : "";
-                    albumObj = new SpotifyResponses.Album(albumName, releaseDate);
-                }
-
-                tracks.add(new SpotifyResponses.Track(name, artists, albumObj));
+            if (isStandardTrack) {
+                tracks.add(parseStandardTrack(node));
                 return;
-            }
-            // Schema 2: Embed Widget Fallback
-            else if (node.has("title") &&
-                    node.has("subtitle") &&
-                    node.has("uri") &&
-                    node.get("uri").asText().contains("track")
-            ) {
-                String name = node.get("title").asText();
-                String artist = node.get("subtitle").asText();
-                tracks.add(new SpotifyResponses.Track(
-                        name,
-                        List.of(new SpotifyResponses.Artist(artist)), null)
-                );
+            } else if (isEmbedTrack) {
+                tracks.add(parseEmbedTrack(node));
                 return;
             }
         }
@@ -274,98 +240,297 @@ public class SpotifyService {
         }
     }
 
-    @SneakyThrows
-    private void downloadTrack(
-            SpotifyResponses.Track track,
-            Path targetDir,
-            SpotiSyncState state,
-            Consumer<SpotiSyncState> onUiUpdate
-    ) {
+    private SpotifyResponses.Track parseStandardTrack(JsonNode node) {
+        String name = node.get("name").asText();
+        List<SpotifyResponses.Artist> artists = new ArrayList<>();
+
+        node.get("artists").forEach(a -> {
+            if (a.has("name")) {
+                artists.add(new SpotifyResponses.Artist(a.get("name").asText()));
+            }
+        });
+
+        SpotifyResponses.Album albumObj = null;
+        if (node.has("album")) {
+            JsonNode albumNode = node.get("album");
+            String albumName = albumNode.has("name") ? albumNode.get("name").asText() : "";
+            String releaseDate = albumNode.has("release_date")
+                    ? albumNode.get("release_date").asText() : "";
+            albumObj = new SpotifyResponses.Album(albumName, releaseDate);
+        }
+
+        return new SpotifyResponses.Track(name, artists, albumObj, "");
+    }
+
+    private SpotifyResponses.Track parseEmbedTrack(JsonNode node) {
+        String name = node.get("title").asText();
+        String artist = node.get("subtitle").asText();
+        return new SpotifyResponses.Track(name, List.of(new SpotifyResponses.Artist(artist)), null, "");
+    }
+
+    private String fetchItunesCoverUrl(String artist, String title) {
+        try {
+            String query = artist + " " + title;
+            String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+            String url = "https://itunes.apple.com/search?term=" + encodedQuery + "&entity=song&limit=1";
+
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                    .GET()
+                    .header("User-Agent", "Mozilla/5.0")
+                    .build();
+
+            HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+            if (res.statusCode() == 200) {
+                JsonNode root = mapper.readTree(res.body());
+                if (root.has("resultCount") && root.get("resultCount").asInt() > 0) {
+                    JsonNode results = root.get("results");
+                    if (results.isArray() && !results.isEmpty()) {
+                        String artworkUrl = results.get(0).get("artworkUrl100").asText();
+                        return artworkUrl.replace("100x100bb.jpg", "600x600bb.jpg");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("iTunes API failed for '{} - {}': {}", artist, title, e.getMessage());
+        }
+        return "";
+    }
+
+    private boolean downloadImage(String urlStr, Path targetPath) {
+        if (urlStr == null || urlStr.isEmpty()) return false;
+        try {
+            var req = HttpRequest.newBuilder(URI.create(urlStr))
+                    .GET()
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .header("Accept", "image/*")
+                    .build();
+
+            var res = httpClient.send(req, HttpResponse.BodyHandlers.ofFile(targetPath));
+
+            if (res.statusCode() != 200) return false;
+            if (!Files.exists(targetPath) || Files.size(targetPath) == 0) return false;
+
+            String contentType = res.headers().firstValue("Content-Type").orElse("").toLowerCase();
+            return contentType.startsWith("image/");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void setupProcessEnvironment(ProcessBuilder pb) {
+        var env = pb.environment();
+        String sysPath = env.getOrDefault("PATH", "");
+        env.put("PATH", "/usr/local/bin:/usr/bin:/bin" + (sysPath.isEmpty() ? "" : ":" + sysPath));
+    }
+
+    private void downloadTrack(SpotifyResponses.Track track,
+                               Path targetDir,
+                               SpotiSyncState state,
+                               Consumer<SpotiSyncState> onUiUpdate) {
+
         if (abortFlag.get()) return;
 
-        var artist = track.artists().isEmpty()
-                ? "Unknown"
-                : track.artists()
-                .get(0)
-                .name()
-                .replace("\"", "");
+        String artist = cleanMetadataString(
+                track.artists().isEmpty() ? "Unknown" : track.artists().get(0).name());
+        String title = cleanMetadataString(track.name());
+        Path finalOutputPath = targetDir.resolve(generateSafeFileName(track) + ".m4a");
 
-        var title = track.name().replace("\"", "");
-        var outputPath = targetDir.resolve(generateSafeFileName(track) + ".m4a");
-
-        // Metadata extraction
-        String ffmpegArgs = metadataExtraction(track, title, artist);
-
-        // Strict search using literal quotes
-        String searchQuery = String.format("ytsearch1:\"%s\" \"%s\" audio", artist, title);
-
-        var command = List.of(
-                "yt-dlp",
-                "-f", "ba/b",
-                "--extract-audio", "--audio-format", "m4a", "--audio-quality", "0",
-                "--output", outputPath.toString(),
-                // NOTE: --embed-metadata is intentionally REMOVED here
-                "--postprocessor-args", ffmpegArgs,
-                searchQuery
-        );
-
-        Path errorLog = Files.createTempFile("ytdlp-err-", ".log");
+        Path tempAudio = null;
+        Path tempCover = null;
+        Path errorLog = null;
 
         try {
-            var pb = new ProcessBuilder(command)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(errorLog.toFile());
+            tempAudio = Files.createTempFile("audio-", ".m4a");
+            Files.deleteIfExists(tempAudio);
 
-            var process = pb.start();
-            activeProcesses.add(process);
-            int exitCode = process.waitFor();
-            activeProcesses.remove(process);
+            tempCover = Files.createTempFile("cover-", ".jpg");
+            errorLog = Files.createTempFile("ytdlp-err-", ".log");
 
-            if (exitCode == 0) state.markTrackSuccess(title);
-            else if (!abortFlag.get()) {
-                String errorDetails = Files.readString(errorLog);
-                log.error("[yt-dlp] Failed for '{} - {}'. Exit Code: {}\nError Output:\n{}",
-                        artist, title, exitCode, errorDetails.trim()
-                );
+            // Query iTunes for the exact track cover
+            String coverUrl = fetchItunesCoverUrl(artist, title);
+            boolean hasCover = downloadImage(coverUrl, tempCover);
+
+            boolean audioDownloaded = executeYtDlp(artist, title, tempAudio, errorLog);
+
+            if (!audioDownloaded) {
+                if (!abortFlag.get()) {
+                    String errorDetails = Files.readString(errorLog);
+                    log.error("[yt-dlp] Failed for '{} - {}'. Output:\n{}",
+                            artist, title, errorDetails.trim());
+                    state.markTrackFailed(title);
+                }
+                return;
+            }
+
+            boolean metadataEmbedded = executeFfmpeg(
+                    track, tempAudio, tempCover, finalOutputPath, hasCover, title, artist, errorLog);
+
+            if (metadataEmbedded) {
+                state.markTrackSuccess(title);
+            } else {
                 state.markTrackFailed(title);
             }
-        } catch (java.io.IOException e) {
-            log.error("[yt-dlp] CRITICAL: Command failed to start. Error: {}", e.getMessage());
+
+        } catch (Exception e) {
+            log.error("[Sync] CRITICAL failure for track '{} - {}'. Error: {}",
+                    artist, title, e.getMessage());
             state.markTrackFailed(title);
         } finally {
-            Files.deleteIfExists(errorLog);
+            cleanupTempFile(tempAudio);
+            cleanupTempFile(tempCover);
+            cleanupTempFile(errorLog);
             broadcastState(state, onUiUpdate, false);
         }
     }
 
-    private boolean hasAlbumName(SpotifyResponses.Track track) {
-        return track.album() != null && track.album().name() != null && !track.album().name().isEmpty();
-    }
+    private boolean executeYtDlp(String artist, String title, Path tempAudio, Path errorLog)
+            throws Exception {
 
-    private boolean hasReleaseDate(SpotifyResponses.Track track) {
-        return track.album() != null &&
-                track.album().releaseDate() != null &&
-                track.album().releaseDate().length() >= 4;
-    }
+        String searchQuery = String.format("ytsearch1:\"%s\" \"%s\" audio", artist, title);
 
-    private String metadataExtraction(SpotifyResponses.Track track, String title, String artist) {
-        String albumName = hasAlbumName(track)
-                ? track.album().name().replace("\"", "")
-                : title; // Fallback album to the single title if Spotify doesn't provide one
+        List<String> command = new ArrayList<>(List.of(
+                "yt-dlp",
+                "-f", "ba/b",
+                "--extract-audio",
+                "--audio-format", "m4a",
+                "--audio-quality", "0",
+                "--output", tempAudio.toString(),
+                searchQuery
+        ));
 
-        String releaseYear = "";
-        if (hasReleaseDate(track)) {
-            releaseYear = track.album().releaseDate().substring(0, 4);
+        var pb = new ProcessBuilder(command)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(errorLog.toFile());
+
+        setupProcessEnvironment(pb);
+
+        Process process = pb.start();
+        activeProcesses.add(process);
+
+        boolean finished = process.waitFor(15, TimeUnit.MINUTES);
+        activeProcesses.remove(process);
+
+        if (!finished) {
+            process.destroyForcibly();
+            log.error("[yt-dlp] Timeout (15m) for '{} - {}'. Process killed.", artist, title);
+            return false;
         }
 
-        // Build exact ffmpeg metadata string
-        String ffmpegArgs = String.format(
-                "ffmpeg:-metadata title=\"%s\" -metadata artist=\"%s\" -metadata album=\"%s\"",
-                title, artist, albumName
-        );
+        return process.exitValue() == 0;
+    }
 
-        if (!releaseYear.isEmpty()) ffmpegArgs += String.format(" -metadata date=\"%s\"", releaseYear);
-        return ffmpegArgs;
+    private boolean executeFfmpeg(SpotifyResponses.Track track,
+                                  Path tempAudio,
+                                  Path coverPath,
+                                  Path finalOutputPath,
+                                  boolean hasCover,
+                                  String title,
+                                  String artist,
+                                  Path errorLog) throws Exception {
+
+        String albumName = getCleanAlbumName(track, title);
+        String releaseYear = getReleaseYear(track);
+
+        List<String> command = new ArrayList<>(List.of(
+                "ffmpeg",
+                "-y",
+                "-i", tempAudio.toString()
+        ));
+
+        if (hasCover && coverPath != null && Files.exists(coverPath) && Files.size(coverPath) > 0) {
+            command.addAll(List.of(
+                    "-i", coverPath.toString(),
+                    "-map", "0:a",
+                    "-map", "1:v",
+                    "-c:a", "copy",
+                    "-c:v", "mjpeg",
+                    "-disposition:v", "attached_pic"
+            ));
+        } else {
+            command.addAll(List.of("-c", "copy"));
+        }
+
+        command.addAll(List.of(
+                "-metadata", "title=" + title,
+                "-metadata", "artist=" + artist,
+                "-metadata", "album=" + albumName
+        ));
+
+        if (!releaseYear.isEmpty()) {
+            command.addAll(List.of("-metadata", "date=" + releaseYear));
+        }
+
+        command.add(finalOutputPath.toString());
+
+        var pb = new ProcessBuilder(command)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(errorLog.toFile());
+
+        setupProcessEnvironment(pb);
+
+        Process process = pb.start();
+        activeProcesses.add(process);
+
+        boolean finished = process.waitFor(5, TimeUnit.MINUTES);
+        activeProcesses.remove(process);
+
+        if (!finished) {
+            process.destroyForcibly();
+            log.error("[ffmpeg] Timeout (5m) for '{} - {}'. Process killed.", artist, title);
+            return false;
+        }
+
+        if (process.exitValue() != 0) {
+            String errorDetails = Files.readString(errorLog);
+            log.error("[ffmpeg] Failed for '{} - {}'. Exit Code: {}\nOutput:\n{}",
+                    artist, title, process.exitValue(), errorDetails.trim());
+            return false;
+        }
+
+        return true;
+    }
+
+    private String getCleanAlbumName(SpotifyResponses.Track track, String fallbackTitle) {
+        if (track.album() != null
+                && track.album().name() != null
+                && !track.album().name().isEmpty()) {
+            return cleanMetadataString(track.album().name());
+        }
+        return fallbackTitle;
+    }
+
+    private String getReleaseYear(SpotifyResponses.Track track) {
+        if (track.album() != null
+                && track.album().releaseDate() != null
+                && track.album().releaseDate().length() >= 4) {
+            return track.album().releaseDate().substring(0, 4);
+        }
+        return "";
+    }
+
+    private String cleanMetadataString(String input) {
+        return input == null ? "" : input.replace("\"", "");
+    }
+
+    private void executeNextcloudScan() {
+        log.info("Spotify sync completed. Triggering automatic Nextcloud index scan...");
+        try {
+            Path musicRootPath = Paths.get(NextcloudService.ROOT_PATH_STR, "Avishai/files/Music");
+            var scanResult = nextcloudService.runOccScan(musicRootPath);
+            log.info("Nextcloud auto-index finished with exit code {}: \n{}",
+                    scanResult.exitCode(), scanResult.output());
+        } catch (Exception e) {
+            log.error("Failed to execute automatic Nextcloud index scan", e);
+        }
+    }
+
+    private void cleanupTempFile(Path tempFile) {
+        if (tempFile != null) {
+            try {
+                Files.deleteIfExists(tempFile);
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     @SneakyThrows
@@ -378,15 +543,12 @@ public class SpotifyService {
     }
 
     private String generateSafeFileName(SpotifyResponses.Track track) {
-        var artist = track.artists().isEmpty() ? "Unknown" : track.artists().get(0).name();
-        return (artist + " - " + track.name()).replaceAll("[\\\\/:*?\"<>|]", "_");
+        String artist = track.artists().isEmpty() ? "Unknown" : track.artists().get(0).name();
+        String rawName = artist + " - " + track.name();
+        return rawName.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
-    private void broadcastState(
-            SpotiSyncState state,
-            Consumer<SpotiSyncState> onUiUpdate,
-            boolean force
-    ) {
+    private void broadcastState(SpotiSyncState state, Consumer<SpotiSyncState> onUiUpdate, boolean force) {
         long now = System.currentTimeMillis();
         if (force || now - lastUiUpdateTime > Config.TELEGRAM_UPDATE_INTERVAL_MS) {
             onUiUpdate.accept(state);
