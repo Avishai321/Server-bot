@@ -48,12 +48,24 @@ public class UpdateRouter {
 
             if (handler != null) {
                 log.info("Executing command: {}", commandSignature);
-                handler.handle(new CommandContext(
-                        commandSignature,
-                        update,
-                        chatIdStr,
-                        messageSender
-                ));
+                try {
+                    handler.handle(new CommandContext(
+                            commandSignature,
+                            update,
+                            chatIdStr,
+                            messageSender
+                    ));
+                } catch (Exception e) {
+                    log.error("Unhandled JVM exception in {}", handler.getClass().getSimpleName(), e);
+
+                    String errorUi = String.format("""
+                            ❌ <b>System Fault</b>
+                            An unexpected internal error occurred.
+                            
+                            <b>Trace:</b> <pre>%s</pre>""", TelegramUi.escapeHtml(e.getMessage()));
+
+                    messageSender.sendMessage(chatIdStr, errorUi);
+                }
             } else handleUnknownCommand(chatIdStr, messageSender);
         }
     }
