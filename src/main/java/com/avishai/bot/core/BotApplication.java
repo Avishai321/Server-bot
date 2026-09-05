@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
-import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeChat;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
@@ -90,7 +90,8 @@ public class BotApplication {
                 .toList();
 
         try {
-            bot.execute(new SetMyCommands(commands, new BotCommandScopeDefault(), null));
+            BotCommandScopeChat scope = new BotCommandScopeChat(String.valueOf(Config.AUTHORIZED_CHAT_ID));
+            bot.execute(new SetMyCommands(commands, scope, null));
         } catch (TelegramApiException e) {
             log.warn("Failed to set native bot commands", e);
         }
