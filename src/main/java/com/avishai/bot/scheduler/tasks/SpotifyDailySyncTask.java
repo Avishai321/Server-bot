@@ -42,10 +42,20 @@ public class SpotifyDailySyncTask extends TelegramScheduledTask {
 
         notifyAdmin("🔄 <b>Automated System Event</b>\nInitiating scheduled 3:00 AM Spotify Sync...");
 
-        // Execute the service completely independent of the Controller Handler
-        spotifyService.runSync(state -> {
-            // Optional: You could update an active message ID here if you want daily logs to stream to the chat.
-            // For now, it runs silently in the background exactly as requested.
+        // 1. Send the initial UI card and grab the message ID
+        Integer messageId = messageSender.sendMessage(
+                adminChatId,
+                """
+                        🎵 <b>TASK:</b> Spotify Music Sync
+                        <b>STATUS:</b> Initializing...
+                        <b>Track:</b> <i>Connecting...</i>"""
+        );
+
+        // 2. Feed the UI update logic into the service so it streams live to Telegram
+        if (messageId != null) spotifyService.runSync(state ->
+                messageSender.editMessage(adminChatId, messageId, state.renderCard())
+        );
+        else spotifyService.runSync(state -> {
         });
     }
 }

@@ -2,6 +2,7 @@ package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.core.CommandContext;
+import com.avishai.bot.core.TelegramUi;
 import com.avishai.bot.services.NextcloudService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,19 +44,6 @@ public class FolderIndexHandler implements CommandHandler {
     }
 
     @Override
-    public String getDetailedHelp() {
-        return """
-                📁 <b>Directory Indexer - Manual</b>
-                
-                * Execute file indexing telemetry.
-                
-                <b>Features:</b>
-                • Navigates dynamically through directories.
-                • Security boundary restricted to <code>/mnt/d</code>.
-                • Streams real-time file processing speed and runtime.""";
-    }
-
-    @Override
     public void handle(CommandContext ctx) {
         String action = ctx.getActionData();
         Integer msgId = ctx.getMessageId();
@@ -80,15 +68,14 @@ public class FolderIndexHandler implements CommandHandler {
                 : ROOT_PATH;
 
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-
-        rows.add(List.of(createButton(
+        rows.add(List.of(TelegramUi.button(
                 "✅ Index: " + validDir.getFileName(),
                 "/idx_run " + registerPath(validDir)
         )));
 
         Path parent = validDir.getParent();
         if (parent != null && parent.startsWith(BOUNDARY_PATH)) {
-            rows.add(List.of(createButton(
+            rows.add(List.of(TelegramUi.button(
                     "🔙 Go Up to " + parent.getFileName(),
                     "/idx_nav " + registerPath(parent)
             )));
@@ -101,20 +88,14 @@ public class FolderIndexHandler implements CommandHandler {
                     .limit(30)
                     .toList();
 
-            List<InlineKeyboardButton> currentRow = new ArrayList<>();
-            for (Path subDir : subDirs) {
-                currentRow.add(createButton(
-                        "📁 " + subDir.getFileName(),
-                        "/idx_nav " + registerPath(subDir)
-                ));
-
-                if (currentRow.size() == 2) {
-                    rows.add(currentRow);
-                    currentRow = new ArrayList<>();
-                }
-            }
-            if (!currentRow.isEmpty()) rows.add(currentRow);
-
+            rows.addAll(TelegramUi.createGrid(
+                    subDirs,
+                    2,
+                    dir -> TelegramUi.button(
+                            "📁 " + dir.getFileName(),
+                            "/idx_nav " + registerPath(dir)
+                    ))
+            );
         } catch (Exception e) {
             log.error("Failed to read directory: {}", validDir, e);
         }
@@ -134,36 +115,30 @@ public class FolderIndexHandler implements CommandHandler {
 
     private void startIndexingProcess(CommandContext ctx, Path targetPath, Integer messageId) {
         if (nextcloudService.isBusy()) {
-            ctx.edit(messageId,
-                    "⚠️ <b>Action Denied:</b> Another bot indexing task is currently running.");
+            ctx.edit(messageId, "⚠️ <b>Action Denied:</b> Another indexing task is currently running.");
             return;
         }
 
         long startTime = System.currentTimeMillis();
         ctx.edit(messageId, String.format("""
-                ⚙️ <b>Nextcloud Indexing Started...</b>
-                <b>Target:</b> <code>%s</code>""", targetPath.toAbsolutePath()), getStopKeyboard());
+                        ⚙️ <b>Nextcloud Indexing Started...</b>
+                        <b>Target:</b> <code>%s</code>""", targetPath.toAbsolutePath()),
+                TelegramUi.singleButtonKeyboard("🛑 Stop Indexing", "/idx_stop"));
 
-        // Launch UI updater timer
         NextcloudService.NextcloudSyncResult result;
         try (ScheduledExecutorService uiScheduler = Executors.newSingleThreadScheduledExecutor()) {
             uiScheduler.scheduleAtFixedRate(() -> {
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-                ctx.edit(messageId,
-                        String.format("""
-                                        ⚙️ <b>Syncing Nextcloud Database...</b>
-                                        <b>Target:</b> <code>%s</code>
-                                        
-                                        ⏱ <b>Elapsed Time:</b> %ds
-                                        <i>Scanning files in background...</i>""",
-                                targetPath.toAbsolutePath(), elapsed),
-                        getStopKeyboard());
+                ctx.edit(messageId, String.format("""
+                                ⚙️ <b>Syncing Nextcloud Database...</b>
+                                <b>Target:</b> <code>%s</code>
+                                
+                                ⏱ <b>Elapsed Time:</b> %ds
+                                <i>Scanning files in background...</i>""", targetPath.toAbsolutePath(), elapsed),
+                        TelegramUi.singleButtonKeyboard("🛑 Stop Indexing", "/idx_stop"));
             }, 1, 1, TimeUnit.SECONDS);
 
-            // Block thread, run the business logic service
             result = nextcloudService.runOccScan(targetPath);
-
-            // Cleanup UI timer and render result
             uiScheduler.shutdownNow();
         }
         renderFinalState(ctx, messageId, targetPath, result);
@@ -177,12 +152,11 @@ public class FolderIndexHandler implements CommandHandler {
     ) {
         if (result.output().contains("Another process is already scanning")) {
             ctx.edit(messageId, String.format("""
-                            ⚠️ <b>Server Busy</b>
-                            <b>Target:</b> <code>%s</code>
-                            
-                            Nextcloud is currently indexing this folder in the background (likely from a previous run).
-                            Please wait a few minutes before trying again.""",
-                    targetPath.toAbsolutePath()));
+                    ⚠️ <b>Server Busy</b>
+                    <b>Target:</b> <code>%s</code>
+                    
+                    Nextcloud is currently indexing this folder in the background (likely from a previous run).
+                    Please wait a few minutes before trying again.""", targetPath.toAbsolutePath()));
             return;
         }
 
@@ -203,27 +177,19 @@ public class FolderIndexHandler implements CommandHandler {
                         
                         <b>Final Output:</b>
                         <pre>%s</pre>""",
-                title, targetPath.toAbsolutePath(), escapeHtml(result.output())));
+                title,
+                targetPath.toAbsolutePath(),
+                TelegramUi.escapeHtml(result.output()))
+        );
     }
 
     private void abortIndexingProcess(CommandContext ctx, Integer messageId) {
         if (nextcloudService.isBusy()) {
-            ctx.edit(messageId,
-                    "⚠️ <i>Executing kill command in Nextcloud container...</i>"
-            );
+            ctx.edit(messageId, "⚠️ <i>Executing kill command in Nextcloud container...</i>");
             nextcloudService.abortScan();
         } else {
             ctx.edit(messageId, "ℹ️ No indexing process is currently running.");
         }
-    }
-
-    private InlineKeyboardMarkup getStopKeyboard() {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(List.of(List.of(createButton(
-                "🛑 Stop Indexing",
-                "/idx_stop")
-        )));
-        return markup;
     }
 
     private String registerPath(Path path) {
@@ -231,20 +197,5 @@ public class FolderIndexHandler implements CommandHandler {
         if (pathCache.size() > 500) pathCache.clear();
         pathCache.put(id, path);
         return id;
-    }
-
-    private InlineKeyboardButton createButton(String text, String callbackData) {
-        InlineKeyboardButton btn = new InlineKeyboardButton();
-        btn.setText(text);
-        btn.setCallbackData(callbackData);
-        return btn;
-    }
-
-    private String escapeHtml(String text) {
-        return text == null
-                ? ""
-                : text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
     }
 }

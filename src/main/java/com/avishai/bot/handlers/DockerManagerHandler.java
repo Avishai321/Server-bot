@@ -2,15 +2,15 @@ package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.core.CommandContext;
+import com.avishai.bot.core.TelegramUi;
 import com.avishai.bot.services.DockerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
@@ -36,19 +36,6 @@ public class DockerManagerHandler implements CommandHandler {
     }
 
     @Override
-    public String getDetailedHelp() {
-        return """
-                🐳 <b>Docker Manager - Manual</b>
-                
-                <b>Interactive UI:</b>
-                Type <code>/docker</code> to get clickable buttons.
-                
-                <b>Direct CLI Commands:</b>
-                <code>/docker restart &lt;container&gt;</code>
-                <code>/docker logs &lt;container&gt; [lines] [format]</code>""";
-    }
-
-    @Override
     public void handle(CommandContext ctx) {
         String action = ctx.getActionData();
         Integer msgId = ctx.getMessageId();
@@ -62,69 +49,54 @@ public class DockerManagerHandler implements CommandHandler {
             String name = action.replace("/docker restart ", "").trim();
             executorService.submit(() -> restartContainer(ctx, name, msgId));
         } else if (action.startsWith("/docker logs ")) {
-            String[] parts = action.split("\\s+");
-            if (parts.length >= 3) {
-                String name = parts[2];
-                int lines = (parts.length >= 4) ? parseLinesArg(parts[3]) : 20;
-                String format = (parts.length >= 5) ? parts[4].toLowerCase() : "auto";
-                executorService.submit(() -> fetchLogs(ctx, name, lines, format));
-            }
+            handleLogsCommand(ctx, action);
         }
     }
 
+    private void handleLogsCommand(CommandContext ctx, String action) {
+        String[] parts = action.split("\\s+");
+        if (parts.length < 3) return;
+
+        String name = parts[2];
+        int lines = (parts.length >= 4) ? parseInteger(parts[3]) : 20;
+        String format = (parts.length >= 5) ? parts[4].toLowerCase() : "auto";
+
+        executorService.submit(() -> fetchLogs(ctx, name, lines, format));
+    }
+
     private void sendMainList(CommandContext ctx, Integer messageId) {
-        String[] containers = dockerService.listContainers();
-        if (containers.length == 0) {
+        List<String> containers = Arrays.stream(dockerService.listContainers())
+                .filter(name -> !name.isBlank())
+                .toList();
+
+        if (containers.isEmpty()) {
             ctx.reply("❌ Failed to fetch containers from Docker engine.");
             return;
         }
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(buildContainerGrid(containers));
+        markup.setKeyboard(TelegramUi.createGrid(
+                containers,
+                2,
+                name -> TelegramUi.button("📦 " + name, "/docker menu " + name))
+        );
 
         String text = "🐳 <b>Docker Management</b>\n\nSelect a container to manage:";
         if (messageId != null) ctx.edit(messageId, text, markup);
         else ctx.reply(text, markup);
     }
 
-    private List<List<InlineKeyboardButton>> buildContainerGrid(String[] containers) {
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        List<InlineKeyboardButton> currentRow = new ArrayList<>();
-
-        for (String name : containers) {
-            if (name.trim().isEmpty()) continue;
-
-            InlineKeyboardButton btn = new InlineKeyboardButton();
-            btn.setText("📦 " + name);
-            btn.setCallbackData("/docker menu " + name);
-            currentRow.add(btn);
-
-            if (currentRow.size() == 2) {
-                rows.add(currentRow);
-                currentRow = new ArrayList<>();
-            }
-        }
-        if (!currentRow.isEmpty()) rows.add(currentRow);
-        return rows;
-    }
-
     private void sendContainerMenu(CommandContext ctx, String name, Integer messageId) {
         String status = dockerService.getContainerStatus(name);
 
-        InlineKeyboardButton restartBtn = new InlineKeyboardButton();
-        restartBtn.setText("🔄 Restart");
-        restartBtn.setCallbackData("/docker restart " + name);
-
-        InlineKeyboardButton logsBtn = new InlineKeyboardButton();
-        logsBtn.setText("📄 Logs");
-        logsBtn.setCallbackData("/docker logs " + name);
-
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("🔙 Back to List");
-        backBtn.setCallbackData(BotCommands.DOCKER_MANAGER);
-
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(List.of(List.of(restartBtn, logsBtn), List.of(backBtn)));
+        markup.setKeyboard(List.of(
+                List.of(
+                        TelegramUi.button("🔄 Restart", "/docker restart " + name),
+                        TelegramUi.button("📄 Logs", "/docker logs " + name)
+                ),
+                List.of(TelegramUi.button("🔙 Back to List", BotCommands.DOCKER_MANAGER))
+        ));
 
         String text = String.format("""
                 📦 <b>Container:</b> <code>%s</code>
@@ -147,7 +119,8 @@ public class DockerManagerHandler implements CommandHandler {
         );
         else ctx.edit(
                 messageId,
-                String.format("❌ Failed to restart <code>%s</code>.\n<pre>%s</pre>", name, response.error())
+                String.format("❌ Failed to restart <code>%s</code>.\n<pre>%s</pre>",
+                        name, TelegramUi.escapeHtml(response.error()))
         );
     }
 
@@ -156,8 +129,7 @@ public class DockerManagerHandler implements CommandHandler {
 
         if (!response.isSuccess()) {
             ctx.reply(String.format("❌ <b>Failed to fetch logs for</b> <code>%s</code>:\n<pre>%s</pre>",
-                    name, response.error()
-            ));
+                    name, TelegramUi.escapeHtml(response.error())));
             return;
         }
 
@@ -180,15 +152,15 @@ public class DockerManagerHandler implements CommandHandler {
                 ctx.reply("❌ Failed to generate the log file.");
             }
         } else {
-            if (logs.length() > 3800) logs = logs.substring(logs.length() - 3800) + "\n\n[Truncated...]";
-            ctx.reply(String.format(
-                    "📄 <b>Logs for</b> <code>%s</code> (Last %d lines):\n<pre>%s</pre>",
-                    name, lines, logs)
-            );
+            if (logs.length() > 3800) {
+                logs = logs.substring(logs.length() - 3800) + "\n\n[Truncated...]";
+            }
+            ctx.reply(String.format("📄 <b>Logs for</b> <code>%s</code> (Last %d lines):\n<pre>%s</pre>",
+                    name, lines, TelegramUi.escapeHtml(logs)));
         }
     }
 
-    private int parseLinesArg(String value) {
+    private int parseInteger(String value) {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
