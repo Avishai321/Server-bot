@@ -266,7 +266,7 @@ public class SpotifyService {
         return new SpotifyResponses.Track(name, List.of(new SpotifyResponses.Artist(artist)), null, "");
     }
 
-    private String fetchItunesCoverUrl(String artist, String title) {
+    private ItunesMetadata fetchItunesMetadata(String artist, String title) {
         try {
             String query = artist + " " + title;
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
@@ -283,15 +283,25 @@ public class SpotifyService {
                 if (root.has("resultCount") && root.get("resultCount").asInt() > 0) {
                     JsonNode results = root.get("results");
                     if (results.isArray() && !results.isEmpty()) {
-                        String artworkUrl = results.get(0).get("artworkUrl100").asText();
-                        return artworkUrl.replace("100x100bb.jpg", "600x600bb.jpg");
+                        JsonNode firstResult = results.get(0);
+
+                        String artworkUrl = firstResult.has("artworkUrl100")
+                                ? firstResult.get("artworkUrl100")
+                                .asText()
+                                .replace("100x100bb.jpg", "600x600bb.jpg")
+                                : "";
+                        String genre = firstResult.has("primaryGenreName")
+                                ? firstResult.get("primaryGenreName").asText()
+                                : "";
+
+                        return new ItunesMetadata(artworkUrl, genre);
                     }
                 }
             }
         } catch (Exception e) {
             log.warn("iTunes API failed for '{} - {}': {}", artist, title, e.getMessage());
         }
-        return "";
+        return new ItunesMetadata("", "");
     }
 
     private boolean downloadImage(String urlStr, Path targetPath) {
@@ -334,8 +344,6 @@ public class SpotifyService {
         int maxRetries = 3;
 
         for (int attempt = 1; attempt <= maxRetries && !abortFlag.get(); attempt++) {
-            // Scope temporary files strictly to the current iteration so they are cleanly garbage
-            // collected/deleted by the finally block, regardless of success or failure.
             Path tempAudio = null;
             Path tempCover = null;
             Path errorLog = null;
@@ -346,8 +354,9 @@ public class SpotifyService {
                 tempCover = Files.createTempFile("cover-", ".jpg");
                 errorLog = Files.createTempFile("ytdlp-err-", ".log");
 
-                String coverUrl = fetchItunesCoverUrl(artist, title);
-                boolean hasCover = downloadImage(coverUrl, tempCover);
+                ItunesMetadata itunesData = fetchItunesMetadata(artist, title);
+                boolean hasCover = downloadImage(itunesData.coverUrl(), tempCover);
+                String genre = itunesData.genre();
 
                 boolean audioDownloaded = executeYtDlp(artist, title, tempAudio, errorLog);
 
@@ -365,7 +374,8 @@ public class SpotifyService {
                     }
                 } else {
                     if (executeFfmpeg(
-                            track, tempAudio, tempCover, finalOutputPath, hasCover, title, artist, errorLog
+                            track, tempAudio, tempCover, finalOutputPath,
+                            hasCover, title, artist, genre, errorLog
                     )) {
                         log.info("Downloaded: '{} - {}' (Attempt {})",
                                 artist, title, attempt);
@@ -446,8 +456,8 @@ public class SpotifyService {
                                   boolean hasCover,
                                   String title,
                                   String artist,
+                                  String genre,
                                   Path errorLog) throws Exception {
-
         String albumName = getCleanAlbumName(track, title);
         String releaseYear = getReleaseYear(track);
 
@@ -468,9 +478,7 @@ public class SpotifyService {
                     "-c:v", "mjpeg",
                     "-disposition:v", "attached_pic"
             ));
-        } else {
-            command.addAll(List.of("-c", "copy"));
-        }
+        } else command.addAll(List.of("-c", "copy"));
 
         command.addAll(List.of(
                 "-metadata", "title=" + title,
@@ -482,17 +490,19 @@ public class SpotifyService {
             command.addAll(List.of("-metadata", "date=" + releaseYear));
         }
 
+        if (genre != null && !genre.isEmpty()) {
+            command.addAll(List.of("-metadata", "genre=" + genre));
+        }
+
         command.add(finalOutputPath.toString());
 
         var pb = new ProcessBuilder(command)
                 .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                 .redirectError(errorLog.toFile());
-
         setupProcessEnvironment(pb);
 
         Process process = pb.start();
         activeProcesses.add(process);
-
         boolean finished = process.waitFor(5, TimeUnit.MINUTES);
         activeProcesses.remove(process);
 
@@ -576,5 +586,8 @@ public class SpotifyService {
             onUiUpdate.accept(state);
             lastUiUpdateTime = now;
         }
+    }
+
+    private record ItunesMetadata(String coverUrl, String genre) {
     }
 }
