@@ -155,10 +155,8 @@ public class SpotifyService {
         for (var track : uniqueTracks) {
             String fileName = generateSafeFileName(track) + ".m4a";
             if (existingFiles.contains(fileName)) {
-                log.info("[{}] Skipped (Already exists): {}", target.folderName(), fileName);
-            } else {
-                missingTracks.add(track);
-            }
+                log.info("Skipped (Already exists): {}", fileName);
+            } else missingTracks.add(track);
         }
 
         log.info("[{}] Folder holds {} files. {} missing tracks queued.",
@@ -327,69 +325,96 @@ public class SpotifyService {
                                Path targetDir,
                                SpotiSyncState state,
                                Consumer<SpotiSyncState> onUiUpdate) {
-
         if (abortFlag.get()) return;
 
-        String artist = cleanMetadataString(
-                track.artists().isEmpty() ? "Unknown" : track.artists().get(0).name());
+        String artist = cleanMetadataString(track.artists().isEmpty() ? "Unknown" : track.artists().get(0).name());
         String title = cleanMetadataString(track.name());
         Path finalOutputPath = targetDir.resolve(generateSafeFileName(track) + ".m4a");
 
-        Path tempAudio = null;
-        Path tempCover = null;
-        Path errorLog = null;
+        int maxRetries = 3;
 
-        try {
-            tempAudio = Files.createTempFile("audio-", ".m4a");
-            Files.deleteIfExists(tempAudio);
+        for (int attempt = 1; attempt <= maxRetries && !abortFlag.get(); attempt++) {
+            // Scope temporary files strictly to the current iteration so they are cleanly garbage
+            // collected/deleted by the finally block, regardless of success or failure.
+            Path tempAudio = null;
+            Path tempCover = null;
+            Path errorLog = null;
 
-            tempCover = Files.createTempFile("cover-", ".jpg");
-            errorLog = Files.createTempFile("ytdlp-err-", ".log");
+            try {
+                tempAudio = Files.createTempFile("audio-", ".m4a");
+                Files.deleteIfExists(tempAudio);
+                tempCover = Files.createTempFile("cover-", ".jpg");
+                errorLog = Files.createTempFile("ytdlp-err-", ".log");
 
-            // Query iTunes for the exact track cover
-            String coverUrl = fetchItunesCoverUrl(artist, title);
-            boolean hasCover = downloadImage(coverUrl, tempCover);
+                String coverUrl = fetchItunesCoverUrl(artist, title);
+                boolean hasCover = downloadImage(coverUrl, tempCover);
 
-            boolean audioDownloaded = executeYtDlp(artist, title, tempAudio, errorLog);
+                boolean audioDownloaded = executeYtDlp(artist, title, tempAudio, errorLog);
 
-            if (!audioDownloaded) {
-                if (!abortFlag.get()) {
+                if (!audioDownloaded) {
                     String errorDetails = Files.readString(errorLog);
-                    log.error("[yt-dlp] Failed for '{} - {}'. Output:\n{}",
-                            artist, title, errorDetails.trim());
-                    state.markTrackFailed(title);
+                    log.warn("[yt-dlp] Attempt {} failed for '{} - {}'. Output:\n{}",
+                            attempt, artist, title, errorDetails.trim());
+
+                    if (errorDetails.contains("ERROR: No video results")) {
+                        log.error("Hard failure (No results found) for '{} - {}'. Aborting retries.",
+                                artist, title);
+
+                        state.markTrackFailed(title);
+                        return;
+                    }
+                } else {
+                    if (executeFfmpeg(
+                            track, tempAudio, tempCover, finalOutputPath, hasCover, title, artist, errorLog
+                    )) {
+                        log.info("Downloaded: '{} - {}' (Attempt {})",
+                                artist, title, attempt);
+                        state.markTrackSuccess(title);
+                        return;
+                    }
+
+                    String errorDetails = Files.readString(errorLog);
+                    log.warn("[ffmpeg] Attempt {} failed for '{} - {}'. Output:\n{}",
+                            attempt, artist, title, errorDetails.trim());
                 }
+
+                if (attempt == maxRetries) {
+                    log.error("Track permanently failed after {} attempts: '{} - {}'", maxRetries, artist, title);
+                    state.markTrackFailed(title);
+                    return;
+                }
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Retry interrupted for '{} - {}'", artist, title);
                 return;
+            } catch (Exception e) {
+                log.warn("Exception during attempt {} for track '{} - {}'. Error: {}",
+                        attempt, artist, title, e.getMessage());
+                if (attempt == maxRetries) {
+                    state.markTrackFailed(title);
+                    return;
+                }
+            } finally {
+                cleanupTempFile(tempAudio);
+                cleanupTempFile(tempCover);
+                cleanupTempFile(errorLog);
+                broadcastState(state, onUiUpdate, false);
             }
-
-            boolean metadataEmbedded = executeFfmpeg(
-                    track, tempAudio, tempCover, finalOutputPath, hasCover, title, artist, errorLog);
-
-            if (metadataEmbedded) {
-                state.markTrackSuccess(title);
-            } else {
-                state.markTrackFailed(title);
-            }
-
-        } catch (Exception e) {
-            log.error("[Sync] CRITICAL failure for track '{} - {}'. Error: {}",
-                    artist, title, e.getMessage());
-            state.markTrackFailed(title);
-        } finally {
-            cleanupTempFile(tempAudio);
-            cleanupTempFile(tempCover);
-            cleanupTempFile(errorLog);
-            broadcastState(state, onUiUpdate, false);
         }
     }
 
     private boolean executeYtDlp(String artist, String title, Path tempAudio, Path errorLog)
             throws Exception {
-
         String searchQuery = String.format("ytsearch1:\"%s\" \"%s\" audio", artist, title);
+
+        // Find the absolute path to deno based on the current user's home directory
+        String userHome = System.getProperty("user.home");
+        String denoPath = userHome + "/.deno/bin/deno";
 
         List<String> command = new ArrayList<>(List.of(
                 "yt-dlp",
+                "--js-runtimes", "deno:" + denoPath, // Inject the Deno JS runtime
                 "-f", "ba/b",
                 "--extract-audio",
                 "--audio-format", "m4a",
@@ -401,21 +426,16 @@ public class SpotifyService {
         var pb = new ProcessBuilder(command)
                 .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                 .redirectError(errorLog.toFile());
-
         setupProcessEnvironment(pb);
-
         Process process = pb.start();
         activeProcesses.add(process);
-
         boolean finished = process.waitFor(15, TimeUnit.MINUTES);
         activeProcesses.remove(process);
-
         if (!finished) {
             process.destroyForcibly();
             log.error("[yt-dlp] Timeout (15m) for '{} - {}'. Process killed.", artist, title);
             return false;
         }
-
         return process.exitValue() == 0;
     }
 
@@ -433,6 +453,8 @@ public class SpotifyService {
 
         List<String> command = new ArrayList<>(List.of(
                 "ffmpeg",
+                "-hide_banner",
+                "-loglevel", "error",
                 "-y",
                 "-i", tempAudio.toString()
         ));
