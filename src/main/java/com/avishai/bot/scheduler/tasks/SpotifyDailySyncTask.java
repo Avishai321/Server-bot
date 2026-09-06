@@ -4,7 +4,7 @@ import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.core.MessageSender;
 import com.avishai.bot.core.TelegramUi;
 import com.avishai.bot.scheduler.TelegramScheduledTask;
-import com.avishai.bot.services.SpotifyService;
+import com.avishai.bot.services.spotify.SpotifyService;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
 import java.time.Duration;

@@ -6,7 +6,7 @@ import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.scheduler.tasks.SpotifyDailySyncTask;
 import com.avishai.bot.services.DockerService;
 import com.avishai.bot.services.NextcloudService;
-import com.avishai.bot.services.SpotifyService;
+import com.avishai.bot.services.spotify.SpotifyService;
 import com.avishai.bot.services.SystemService;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
