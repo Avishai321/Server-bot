@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -154,7 +156,7 @@ public class FolderIndexHandler implements CommandHandler {
     ) {
         if (result.output().contains("Another process is already scanning")) {
             ctx.edit(messageId, String.format("""
-                    ⚠️ <b>Server Busy</b>
+                      <b>Server Busy</b>
                     <b>Target:</b> <code>%s</code>
                     
                     Nextcloud is currently indexing this folder in the background (likely from a previous run).
@@ -164,24 +166,42 @@ public class FolderIndexHandler implements CommandHandler {
 
         if (result.exitCode() == 137 || result.exitCode() == 143) {
             ctx.edit(messageId, String.format("""
-                    🛑 <b>Indexing Aborted by User</b>
+                      <b>Indexing Aborted by User</b>
                     <b>Target:</b> <code>%s</code>""", targetPath.toAbsolutePath()));
             return;
         }
 
         String title = (result.exitCode() == 0)
-                ? "✅ <b>Indexing Completed</b>"
-                : "❌ <b>Indexing Failed (Code: " + result.exitCode() + ")";
+                ? "  <b>Indexing Completed</b>"
+                : "  <b>Indexing Failed (Code: " + result.exitCode() + ")</b>";
+
+        String outputUI;
+        // Regex to extract the 7 data columns from the ASCII table
+        Pattern pattern = Pattern.compile(
+                "\\|\\s*(\\d+)\\s*\\|\\s*(\\d+)\\s*\\|\\s*(\\d+)\\s*\\" +
+                        "|\\s*(\\d+)\\s*\\|\\s*(\\d+)\\s*\\|\\s*(\\d+)\\s*\\" +
+                        "|\\s*([\\d:]+)\\s*\\|");
+        Matcher m = pattern.matcher(result.output());
+
+        if (m.find()) outputUI = String.format("""
+                        📁 <b>Folders:</b> %s | 📄 <b>Files:</b> %s
+                        ✨ <b>New:</b> %s | 🔄 <b>Updated:</b> %s | 🗑️ <b>Removed:</b> %s
+                        ⏱️ <b>Time:</b> %s | ⚠️ <b>Errors:</b> %s""",
+                m.group(1), m.group(2),
+                m.group(3), m.group(4), m.group(5),
+                m.group(7), m.group(6));
+            // Fallback if the output doesn't match the expected table format
+        else outputUI = "<pre>" + TelegramUi.escapeHtml(result.output()) + "</pre>";
 
         ctx.edit(messageId, String.format("""
                         %s
                         <b>Target:</b> <code>%s</code>
                         
-                        <b>Final Output:</b>
-                        <pre>%s</pre>""",
+                        <b>Results:</b>
+                        %s""",
                 title,
                 targetPath.toAbsolutePath(),
-                TelegramUi.escapeHtml(result.output()))
+                outputUI)
         );
     }
 
@@ -189,9 +209,7 @@ public class FolderIndexHandler implements CommandHandler {
         if (nextcloudService.isBusy()) {
             ctx.edit(messageId, "⚠️ <i>Executing kill command in Nextcloud container...</i>");
             nextcloudService.abortScan();
-        } else {
-            ctx.edit(messageId, "ℹ️ No indexing process is currently running.");
-        }
+        } else ctx.edit(messageId, "ℹ️ No indexing process is currently running.");
     }
 
     private String registerPath(Path path) {
