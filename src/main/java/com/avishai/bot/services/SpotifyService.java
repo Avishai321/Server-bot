@@ -515,7 +515,7 @@ public class SpotifyService {
     private void executeNextcloudScan() {
         log.info("Spotify sync completed. Triggering automatic Nextcloud index scan...");
         try {
-            Path musicRootPath = Paths.get(NextcloudService.ROOT_PATH_STR, "Avishai/files/Music");
+            Path musicRootPath = Paths.get(Config.MUSIC_STORAGE_ROOT);
             var scanResult = nextcloudService.runOccScan(musicRootPath);
             log.info("Nextcloud auto-index finished with exit code {}: \n{}",
                     scanResult.exitCode(), scanResult.output());

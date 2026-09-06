@@ -22,16 +22,18 @@ public class NextcloudService {
         if (!isIndexing.compareAndSet(false, true)) {
             return new NextcloudSyncResult(-1, "Process already running.");
         }
-
         try {
             String occCommand = formatOccCommand(targetPath);
+
+            // Trick: Pipe to cat to force non-interactive mode and disable the messy progress bar.
+            // pipefail ensures we don't lose the exit code if the occ command crashes.
             List<String> command = List.of(
                     "docker", "exec", "--user", "www-data",
-                    "nextcloud-server-app-1", "bash", "-c", occCommand
+                    "nextcloud-server-app-1", "bash", "-c",
+                    "set -o pipefail; " + occCommand + " | cat"
             );
 
             log.info("Executing OCC Command: {}", occCommand);
-
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
             currentProcess = pb.start();
@@ -40,12 +42,12 @@ public class NextcloudService {
                     currentProcess.getInputStream().readAllBytes(),
                     StandardCharsets.UTF_8
             );
-
             int exitCode = currentProcess.waitFor();
-            String cleanOutput = rawOutput.replaceAll("\u001B\\[[;\\d]*m", "").trim();
+
+            // Fix: Broaden regex to strip ALL ANSI cursor movements, not just color codes
+            String cleanOutput = rawOutput.replaceAll("\u001B\\[[;\\d]*[a-zA-Z]", "").trim();
 
             return new NextcloudSyncResult(exitCode, cleanOutput);
-
         } catch (Exception e) {
             log.error("OCC Scan failed", e);
             return new NextcloudSyncResult(-1, e.getMessage());
@@ -82,7 +84,13 @@ public class NextcloudService {
             relativePath = relativePath.substring(1);
         }
 
-        return "php occ files:scan --path=\"" + relativePath + "\"";
+        // Nextcloud requires the path format: user_id/files/path
+        String nextcloudPath = "Avishai/files";
+        if (!relativePath.isEmpty()) {
+            nextcloudPath += "/" + relativePath;
+        }
+
+        return "php occ files:scan --path=\"" + nextcloudPath + "\"";
     }
 
     public record NextcloudSyncResult(int exitCode, String output) {}
