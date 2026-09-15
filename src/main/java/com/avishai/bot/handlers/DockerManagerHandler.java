@@ -36,6 +36,25 @@ public class DockerManagerHandler implements CommandHandler {
     }
 
     @Override
+    public String getDetailedHelp() {
+        return """
+                🐳 <b>Docker Manager Help</b>
+                Manage your server's Docker containers via interactive menus or direct commands.
+                
+                <b>Interactive Command:</b>
+                • <code>%s</code> - Opens the main grid of all available containers.
+                
+                <b>Direct Commands (Internal Routing):</b>
+                • <code>/docker menu &lt;name&gt;</code> - View status and actions for a specific container.
+                • <code>/docker restart &lt;name&gt;</code> - Restart a target container.
+                • <code>/docker logs &lt;name&gt; [lines] [format]</code> - Fetch container logs.
+                  <i>lines:</i> Default is 20.
+                  <i>format:</i> 'auto' (default) or 'file'.
+                    Auto sends as a text message, or .txt file if the output is too long.
+                """.formatted(BotCommands.DOCKER_MANAGER);
+    }
+
+    @Override
     public void handle(CommandContext ctx) {
         String action = ctx.getActionData();
         Integer msgId = ctx.getMessageId();
