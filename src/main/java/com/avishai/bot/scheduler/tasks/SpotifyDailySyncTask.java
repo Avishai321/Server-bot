@@ -29,7 +29,10 @@ public class SpotifyDailySyncTask extends TelegramScheduledTask {
     public long getInitialDelayInSeconds() {
         ZoneId zone = ZoneId.of("Asia/Jerusalem");
         ZonedDateTime now = ZonedDateTime.now(zone);
-        ZonedDateTime nextRun = now.withHour(3).withMinute(0).withSecond(0).withNano(0);
+        ZonedDateTime nextRun = now.withHour(3)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0);
         if (now.compareTo(nextRun) > 0) nextRun = nextRun.plusDays(1);
         return Duration.between(now, nextRun).getSeconds();
     }
@@ -43,7 +46,8 @@ public class SpotifyDailySyncTask extends TelegramScheduledTask {
     protected void executeTask() {
         if (spotifyService.isBusy()) return;
 
-        notifyAdmin("🔄 <b>Automated System Event</b>\nInitiating scheduled 3:00 AM Spotify Sync...");
+        notifyAdmin("🔄 <b>Automated System Event</b>" +
+                "\nInitiating scheduled 3:00 AM Spotify Sync...");
 
         Integer messageId = messageSender.sendMessage(
                 adminChatId,
@@ -52,13 +56,17 @@ public class SpotifyDailySyncTask extends TelegramScheduledTask {
                         
                         🚀 <b>STATUS:</b> Initializing...
                         🎧 <b>Track:</b> <i>Connecting...</i>""",
-                TelegramUi.singleButtonKeyboard("🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
+                TelegramUi.singleButtonKeyboard(
+                        "🛑 Abort",
+                        BotCommands.STOP_SPOTIFY_BACKUP
+                )
         );
 
         if (messageId != null) {
             spotifyService.runSync(state -> {
                 InlineKeyboardMarkup keyboard = state.isActive()
-                        ? TelegramUi.singleButtonKeyboard("🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
+                        ? TelegramUi.singleButtonKeyboard(
+                        "🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
                         : null;
                 messageSender.editMessage(adminChatId, messageId, state.renderCard(), keyboard);
             });

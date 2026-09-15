@@ -64,7 +64,11 @@ public class FolderIndexHandler implements CommandHandler {
         }
     }
 
-    private void sendDirectoryMenu(CommandContext ctx, Path currentDir, Integer messageId) {
+    private void sendDirectoryMenu(
+            CommandContext ctx,
+            Path currentDir,
+            Integer messageId
+    ) {
         Path validDir = (Files.exists(currentDir) && Files.isDirectory(currentDir))
                 ? currentDir
                 : ROOT_PATH;
@@ -119,7 +123,9 @@ public class FolderIndexHandler implements CommandHandler {
 
     private void startIndexingProcess(CommandContext ctx, Path targetPath, Integer messageId) {
         if (nextcloudService.isBusy()) {
-            ctx.edit(messageId, "⚠️ <b>Action Denied:</b> Another indexing task is currently running.");
+            ctx.edit(messageId,
+                    "⚠️ <b>Action Denied:</b> " +
+                            "Another indexing task is currently running.");
             return;
         }
 
@@ -127,19 +133,26 @@ public class FolderIndexHandler implements CommandHandler {
         ctx.edit(messageId, String.format("""
                         ⚙️ <b>Nextcloud Indexing Started...</b>
                         <b>Target:</b> <code>%s</code>""", targetPath.toAbsolutePath()),
-                TelegramUi.singleButtonKeyboard("🛑 Stop Indexing", "/idx_stop"));
+                TelegramUi.singleButtonKeyboard(
+                        "🛑 Stop Indexing",
+                        "/idx_stop")
+        );
 
         NextcloudService.NextcloudSyncResult result;
         try (ScheduledExecutorService uiScheduler = Executors.newSingleThreadScheduledExecutor()) {
             uiScheduler.scheduleAtFixedRate(() -> {
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
                 ctx.edit(messageId, String.format("""
-                                ⚙️ <b>Syncing Nextcloud Database...</b>
-                                <b>Target:</b> <code>%s</code>
-                                
-                                ⏱ <b>Elapsed Time:</b> %ds
-                                <i>Scanning files in background...</i>""", targetPath.toAbsolutePath(), elapsed),
-                        TelegramUi.singleButtonKeyboard("🛑 Stop Indexing", "/idx_stop"));
+                                        ⚙️ <b>Syncing Nextcloud Database...</b>
+                                        <b>Target:</b> <code>%s</code>
+                                        
+                                        ⏱ <b>Elapsed Time:</b> %ds
+                                        <i>Scanning files in background...</i>""",
+                                targetPath.toAbsolutePath(), elapsed),
+                        TelegramUi.singleButtonKeyboard(
+                                "🛑 Stop Indexing",
+                                "/idx_stop")
+                );
             }, 1, 1, TimeUnit.SECONDS);
 
             result = nextcloudService.runOccScan(targetPath);
@@ -156,11 +169,12 @@ public class FolderIndexHandler implements CommandHandler {
     ) {
         if (result.output().contains("Another process is already scanning")) {
             ctx.edit(messageId, String.format("""
-                      <b>Server Busy</b>
-                    <b>Target:</b> <code>%s</code>
-                    
-                    Nextcloud is currently indexing this folder in the background (likely from a previous run).
-                    Please wait a few minutes before trying again.""", targetPath.toAbsolutePath()));
+                              <b>Server Busy</b>
+                            <b>Target:</b> <code>%s</code>
+                            
+                            Nextcloud is currently indexing this folder in the background.
+                            Please wait a few minutes before trying again.""",
+                    targetPath.toAbsolutePath()));
             return;
         }
 
@@ -207,7 +221,9 @@ public class FolderIndexHandler implements CommandHandler {
 
     private void abortIndexingProcess(CommandContext ctx, Integer messageId) {
         if (nextcloudService.isBusy()) {
-            ctx.edit(messageId, "⚠️ <i>Executing kill command in Nextcloud container...</i>");
+            ctx.edit(messageId,
+                    "⚠️ <i>Executing kill command in Nextcloud container...</i>"
+            );
             nextcloudService.abortScan();
         } else ctx.edit(messageId, "ℹ️ No indexing process is currently running.");
     }

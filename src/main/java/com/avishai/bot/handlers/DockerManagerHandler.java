@@ -95,9 +95,11 @@ public class DockerManagerHandler implements CommandHandler {
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(TelegramUi.createGrid(
-                containers,
-                2,
-                name -> TelegramUi.button("📦 " + name, "/docker menu " + name))
+                        containers,
+                        2,
+                        name -> TelegramUi.button("📦 " + name,
+                                "/docker menu " + name)
+                )
         );
 
         String text = "🐳 <b>Docker Management</b>\n\nSelect a container to manage:";
@@ -105,7 +107,11 @@ public class DockerManagerHandler implements CommandHandler {
         else ctx.reply(text, markup);
     }
 
-    private void sendContainerMenu(CommandContext ctx, String name, Integer messageId) {
+    private void sendContainerMenu(
+            CommandContext ctx,
+            String name,
+            Integer messageId
+    ) {
         String status = dockerService.getContainerStatus(name);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -147,13 +153,19 @@ public class DockerManagerHandler implements CommandHandler {
         var response = dockerService.getLogs(name, lines);
 
         if (!response.isSuccess()) {
-            ctx.reply(String.format("❌ <b>Failed to fetch logs for</b> <code>%s</code>:\n<pre>%s</pre>",
+            ctx.reply(String.format("❌ <b>Failed to fetch logs for</b> <code>%s</code>:" +
+                            "\n<pre>%s</pre>",
                     name, TelegramUi.escapeHtml(response.error())));
             return;
         }
 
-        String logs = response.output().isEmpty() ? "[No recent logs found]" : response.output();
-        boolean sendAsFile = format.equals("file") || (format.equals("auto") && logs.length() > 3800);
+        String logs = response.output().isEmpty()
+                ? "[No recent logs found]"
+                : response.output();
+
+        boolean sendAsFile = format.equals("file")
+                || (format.equals("auto")
+                && logs.length() > 3800);
 
         if (sendAsFile) {
             try {
@@ -174,7 +186,8 @@ public class DockerManagerHandler implements CommandHandler {
             if (logs.length() > 3800) {
                 logs = logs.substring(logs.length() - 3800) + "\n\n[Truncated...]";
             }
-            ctx.reply(String.format("📄 <b>Logs for</b> <code>%s</code> (Last %d lines):\n<pre>%s</pre>",
+            ctx.reply(String.format("📄 <b>Logs for</b> <code>%s</code> (Last %d lines):" +
+                            "\n<pre>%s</pre>",
                     name, lines, TelegramUi.escapeHtml(logs)));
         }
     }

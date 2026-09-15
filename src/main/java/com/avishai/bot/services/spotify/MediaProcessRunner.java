@@ -23,8 +23,16 @@ public class MediaProcessRunner {
         activeProcesses.forEach(Process::destroyForcibly);
     }
 
-    public boolean executeYtDlp(String artist, String title, Path tempAudio, Path errorLog) throws Exception {
-        String searchQuery = String.format("ytsearch1:\"%s\" \"%s\" audio", artist, title);
+    public boolean executeYtDlp(
+            String artist,
+            String title,
+            Path tempAudio,
+            Path errorLog
+    ) throws Exception {
+
+        String searchQuery = String.format("ytsearch1:\"%s\" \"%s\" audio",
+                artist, title
+        );
         String userHome = System.getProperty("user.home");
         String denoPath = userHome + "/.deno/bin/deno";
 
@@ -51,23 +59,27 @@ public class MediaProcessRunner {
 
         if (!finished) {
             process.destroyForcibly();
-            log.error("[yt-dlp] Timeout (15m) for '{} - {}'. Process killed.", artist, title);
+            log.error("[yt-dlp] Timeout (15m) for '{} - {}'. Process killed.",
+                    artist, title
+            );
             return false;
         }
         return process.exitValue() == 0;
     }
 
     // ... inside MediaProcessRunner.java
-    public boolean executeFfmpeg(SpotifyResponses.Track track,
-                                 Path tempAudio,
-                                 Path coverPath,
-                                 Path finalOutputPath,
-                                 boolean hasCover,
-                                 String title,
-                                 String artist,
-                                 ItunesClient.ItunesMetadata itunesData,
-                                 String lyrics,
-                                 Path errorLog) throws Exception {
+    public boolean executeFfmpeg(
+            SpotifyResponses.Track track,
+            Path tempAudio,
+            Path coverPath,
+            Path finalOutputPath,
+            boolean hasCover,
+            String title,
+            String artist,
+            ItunesClient.ItunesMetadata itunesData,
+            String lyrics,
+            Path errorLog
+    ) throws Exception {
 
         String albumName = getCleanAlbumName(track, title);
         String releaseYear = getReleaseYear(track);
@@ -83,7 +95,10 @@ public class MediaProcessRunner {
                 "-i", tempAudio.toString()
         ));
 
-        if (hasCover && coverPath != null && Files.exists(coverPath) && Files.size(coverPath) > 0) {
+        if (hasCover
+                && coverPath != null
+                && Files.exists(coverPath)
+                && Files.size(coverPath) > 0) {
             command.addAll(List.of(
                     "-i", coverPath.toString(),
                     "-map", "0:a",
@@ -105,10 +120,16 @@ public class MediaProcessRunner {
         appendMetadata(command, "lyrics", lyrics);
 
         if (itunesData.trackNumber() != null && itunesData.trackCount() != null) {
-            appendMetadata(command, "track", itunesData.trackNumber() + "/" + itunesData.trackCount());
+            appendMetadata(command,
+                    "track",
+                    itunesData.trackNumber() + "/" + itunesData.trackCount()
+            );
         }
         if (itunesData.discNumber() != null && itunesData.discCount() != null) {
-            appendMetadata(command, "disc", itunesData.discNumber() + "/" + itunesData.discCount());
+            appendMetadata(command,
+                    "disc",
+                    itunesData.discNumber() + "/" + itunesData.discCount()
+            );
         }
 
         command.add(finalOutputPath.toString());
@@ -125,7 +146,8 @@ public class MediaProcessRunner {
 
         if (!finished) {
             process.destroyForcibly();
-            log.error("[ffmpeg] Timeout (5m) for '{} - {}'. Process killed.", artist, title);
+            log.error("[ffmpeg] Timeout (5m) for '{} - {}'. Process killed.",
+                    artist, title);
             return false;
         }
         return process.exitValue() == 0;
@@ -141,11 +163,19 @@ public class MediaProcessRunner {
     private void setupProcessEnvironment(ProcessBuilder pb) {
         var env = pb.environment();
         String sysPath = env.getOrDefault("PATH", "");
-        env.put("PATH", "/usr/local/bin:/usr/bin:/bin" + (sysPath.isEmpty() ? "" : ":" + sysPath));
+        env.put(
+                "PATH", "/usr/local/bin:/usr/bin:/bin"
+                        + (sysPath.isEmpty() ? "" : ":" + sysPath)
+        );
     }
 
-    private String getCleanAlbumName(SpotifyResponses.Track track, String fallbackTitle) {
-        if (track.album() != null && track.album().name() != null && !track.album().name().isEmpty()) {
+    private String getCleanAlbumName(
+            SpotifyResponses.Track track,
+            String fallbackTitle
+    ) {
+        if (track.album() != null
+                && track.album().name() != null
+                && !track.album().name().isEmpty()) {
             return cleanMetadataString(track.album().name());
         }
         return fallbackTitle;

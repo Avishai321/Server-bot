@@ -5,7 +5,11 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 
 import java.io.File;
 
-public record CommandContext(String command, Update update, String chatId, MessageSender messageSender) {
+public record CommandContext(String command,
+                             Update update,
+                             String chatId,
+                             MessageSender messageSender
+) {
     public Integer reply(String text) {
         return messageSender.sendMessage(this.chatId, text);
     }
@@ -33,7 +37,8 @@ public record CommandContext(String command, Update update, String chatId, Messa
     }
 
     public Integer getMessageId() {
-        if (update.hasCallbackQuery()) return update.getCallbackQuery().getMessage().getMessageId();
+        if (update.hasCallbackQuery())
+            return update.getCallbackQuery().getMessage().getMessageId();
         return null; // A new message doesn't have an existing messageId to edit
     }
 }

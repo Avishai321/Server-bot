@@ -31,14 +31,18 @@ public class ItunesClient {
         try {
             String query = artist + " " + title;
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-            String url = "https://itunes.apple.com/search?term=" + encodedQuery + "&entity=song&limit=1";
+            String url = "https://itunes.apple.com/search?term=" + encodedQuery
+                    + "&entity=song&limit=1";
 
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                     .GET()
                     .header("User-Agent", "Mozilla/5.0")
                     .build();
 
-            HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> res = httpClient.send(
+                    req,
+                    HttpResponse.BodyHandlers.ofString()
+            );
 
             if (res.statusCode() == 200) {
                 JsonNode root = mapper.readTree(res.body());
@@ -48,14 +52,16 @@ public class ItunesClient {
                 }
             }
         } catch (Exception e) {
-            log.warn("iTunes API failed for '{} - {}': {}", artist, title, e.getMessage());
+            log.warn("iTunes API failed for '{} - {}': {}",
+                    artist, title, e.getMessage());
         }
         return Optional.empty();
     }
 
     private ItunesMetadata parseMetadataNode(JsonNode node) {
         String artworkUrl = node.path("artworkUrl100")
-                .asText("").replace("100x100bb.jpg", "600x600bb.jpg");
+                .asText("")
+                .replace("100x100bb.jpg", "600x600bb.jpg");
         String genre = node.path("primaryGenreName").asText("");
 
         String releaseDate = node.path("releaseDate").asText("");
@@ -66,7 +72,8 @@ public class ItunesClient {
         Integer discNum = node.has("discNumber") ? node.get("discNumber").asInt() : null;
         Integer discCount = node.has("discCount") ? node.get("discCount").asInt() : null;
 
-        return new ItunesMetadata(artworkUrl, genre, releaseYear, trackNum, trackCount, discNum, discCount);
+        return new ItunesMetadata(artworkUrl, genre, releaseYear,
+                trackNum, trackCount, discNum, discCount);
     }
 
     public boolean downloadImage(String urlStr, Path targetPath) {
@@ -74,14 +81,19 @@ public class ItunesClient {
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(urlStr))
                     .GET()
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .header("User-Agent",
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     .header("Accept", "image/*")
                     .build();
             var res = httpClient.send(req, HttpResponse.BodyHandlers.ofFile(targetPath));
             if (res.statusCode() != 200) return false;
             if (!Files.exists(targetPath) || Files.size(targetPath) == 0) return false;
 
-            String contentType = res.headers().firstValue("Content-Type").orElse("").toLowerCase();
+            String contentType = res.headers()
+                    .firstValue("Content-Type")
+                    .orElse("")
+                    .toLowerCase();
+
             return contentType.startsWith("image/");
         } catch (Exception e) {
             return false;

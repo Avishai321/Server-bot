@@ -56,7 +56,9 @@ public class UpdateRouter {
                             messageSender
                     ));
                 } catch (Exception e) {
-                    log.error("Unhandled JVM exception in {}", handler.getClass().getSimpleName(), e);
+                    log.error("Unhandled JVM exception in {}",
+                            handler.getClass().getSimpleName(), e
+                    );
 
                     String errorUi = String.format("""
                             ❌ <b>System Fault</b>
@@ -73,6 +75,7 @@ public class UpdateRouter {
     public void handleUnknownCommand(String chatId, MessageSender messageSender) {
         messageSender.sendMessage(chatId,
                 "⚠️ <b>Unknown Command</b>\n" +
-                        "I don't recognize that instruction. Type /help to see the available modules.");
+                        "I don't recognize that instruction. " +
+                        "Type /help to see the available modules.");
     }
 }

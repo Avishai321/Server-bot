@@ -111,8 +111,11 @@ public class SpotifyService {
                                  SpotiSyncState state,
                                  Consumer<SpotiSyncState> onUiUpdate) throws Exception {
 
-        List<SpotifyResponses.Track> uniqueTracks = scraper.extractTracks(target.link(), target.folderName())
-                .stream().distinct().toList();
+        List<SpotifyResponses.Track> uniqueTracks = scraper
+                .extractTracks(target.link(), target.folderName())
+                .stream()
+                .distinct()
+                .toList();
 
         log.info("[{}] Extracted {} unique tracks.", target.folderName(), uniqueTracks.size());
         if (uniqueTracks.isEmpty()) {
@@ -200,21 +203,25 @@ public class SpotifyService {
                         return;
                     }
                     String errorDetails = Files.readString(errorLog);
-                    log.warn("[ffmpeg] failed for '{} - {}'. Output:\n{}", artist, title, errorDetails.trim());
+                    log.warn("[ffmpeg] failed for '{} - {}'. Output:\n{}",
+                            artist, title, errorDetails.trim());
                 }
 
                 if (attempt == maxRetries) {
-                    log.error("Track permanently failed after {} attempts: '{} - {}'", maxRetries, artist, title);
+                    log.error("Track permanently failed after {} attempts: '{} - {}'",
+                            maxRetries, artist, title);
                     state.markTrackFailed(title);
                     return;
                 }
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.warn("Retry interrupted for '{} - {}'", artist, title);
+                log.warn("Retry interrupted for '{} - {}'",
+                        artist, title);
                 return;
             } catch (Exception e) {
-                log.warn("Exception for '{} - {}'. Error: {}", artist, title, e.getMessage());
+                log.warn("Exception for '{} - {}'. Error: {}",
+                        artist, title, e.getMessage());
                 if (attempt == maxRetries) {
                     state.markTrackFailed(title);
                     return;
@@ -266,7 +273,11 @@ public class SpotifyService {
         return rawName.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
-    private void broadcastState(SpotiSyncState state, Consumer<SpotiSyncState> onUiUpdate, boolean force) {
+    private void broadcastState(
+            SpotiSyncState state,
+            Consumer<SpotiSyncState> onUiUpdate,
+            boolean force
+    ) {
         long now = System.currentTimeMillis();
         if (force || now - lastUiUpdateTime > Config.TELEGRAM_UPDATE_INTERVAL_MS) {
             onUiUpdate.accept(state);

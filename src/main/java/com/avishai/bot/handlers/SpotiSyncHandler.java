@@ -51,7 +51,8 @@ public class SpotiSyncHandler implements CommandHandler {
 
     private void triggerSync(CommandContext ctx) {
         if (spotifyService.isBusy()) {
-            ctx.reply(String.format("⚠️ A sync is already in progress!\nType %s to terminate it.",
+            ctx.reply(String.format(
+                    "⚠️ A sync is already in progress!\nType %s to terminate it.",
                     BotCommands.STOP_SPOTIFY_BACKUP));
             return;
         }
@@ -61,12 +62,16 @@ public class SpotiSyncHandler implements CommandHandler {
                         
                         🚀 <b>STATUS:</b> Initializing...
                         🎧 <b>Track:</b> <i>Connecting...</i>""",
-                TelegramUi.singleButtonKeyboard("🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP));
+                TelegramUi.singleButtonKeyboard(
+                        "🛑 Abort",
+                        BotCommands.STOP_SPOTIFY_BACKUP)
+        );
 
         if (messageId != null) {
             executorService.submit(() -> spotifyService.runSync(state -> {
                 InlineKeyboardMarkup keyboard = state.isActive()
-                        ? TelegramUi.singleButtonKeyboard("🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
+                        ? TelegramUi.singleButtonKeyboard(
+                        "🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
                         : null;
 
                 ctx.edit(messageId, state.renderCard(), keyboard);
@@ -77,7 +82,8 @@ public class SpotiSyncHandler implements CommandHandler {
     private void abortSync(CommandContext ctx) {
         if (spotifyService.isBusy()) {
             spotifyService.abortSync();
-            ctx.reply("🛑 <b>Abort Signal Sent!</b>\nThe sync process is being forcibly terminated.");
+            ctx.reply("🛑 <b>Abort Signal Sent!</b>" +
+                    "\nThe sync process is being forcibly terminated.");
         } else ctx.reply("ℹ️ No sync process is currently running.");
     }
 }

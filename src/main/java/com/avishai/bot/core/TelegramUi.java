@@ -17,7 +17,9 @@ public class TelegramUi {
         return button;
     }
 
-    public static InlineKeyboardMarkup singleButtonKeyboard(String text, String callbackData) {
+    public static InlineKeyboardMarkup singleButtonKeyboard(String text,
+                                                            String callbackData
+    ) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(List.of(List.of(button(text, callbackData))));
         return markup;

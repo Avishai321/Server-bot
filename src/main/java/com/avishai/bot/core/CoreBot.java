@@ -57,7 +57,12 @@ public class CoreBot extends TelegramLongPollingBot implements MessageSender {
     }
 
     @Override
-    public void editMessage(String chatId, Integer messageId, String text, InlineKeyboardMarkup keyboard) {
+    public void editMessage(
+            String chatId,
+            Integer messageId,
+            String text,
+            InlineKeyboardMarkup keyboard
+    ) {
         if (messageId == null) return;
 
         EditMessageText editMessage = new EditMessageText();

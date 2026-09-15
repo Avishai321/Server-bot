@@ -31,7 +31,8 @@ public class TaskScheduler {
             long initialDelay = task.getInitialDelayInSeconds();
             long period = task.getPeriodInSeconds();
             executorService.scheduleAtFixedRate(task, initialDelay, period, TimeUnit.SECONDS);
-            log.info("Task '{}' scheduled. Next run in {}s, interval: {}s", task.getTaskName(), initialDelay, period);
+            log.info("Task '{}' scheduled. Next run in {}s, interval: {}s",
+                    task.getTaskName(), initialDelay, period);
         }
     }
 

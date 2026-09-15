@@ -67,7 +67,7 @@ public class HelpHandler implements CommandHandler {
             }
         }
 
-        helpText.append("💡 <b>Pro Tip:</b> Type <code>/help [command]</code> for advanced syntax.");
+        helpText.append("💡 Type <code>/help [command]</code> for advanced syntax.");
         ctx.reply(helpText.toString());
     }
 
@@ -81,8 +81,10 @@ public class HelpHandler implements CommandHandler {
                 .findFirst()
                 .ifPresentOrElse(
                         handler -> ctx.reply(handler.getDetailedHelp()),
-                        () -> ctx.reply("⚠️ No detailed documentation found for that topic. " +
-                                "Type /help for the main menu.")
+                        () -> ctx.reply(
+                                "⚠️ No detailed documentation found for that topic. " +
+                                        "Type /help for the main menu."
+                        )
                 );
     }
 }

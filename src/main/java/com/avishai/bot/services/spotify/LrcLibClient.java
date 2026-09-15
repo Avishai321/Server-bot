@@ -21,7 +21,12 @@ public class LrcLibClient {
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
 
-    public String fetchLyrics(String artist, String title, Path targetDir, String baseFileName) {
+    public String fetchLyrics(
+            String artist,
+            String title,
+            Path targetDir,
+            String baseFileName
+    ) {
         return findLocalLyrics(targetDir, baseFileName)
                 .orElseGet(() -> fetchApiLyrics(artist, title));
     }
@@ -34,7 +39,8 @@ public class LrcLibClient {
             if (Files.exists(lrcPath)) return Optional.of(Files.readString(lrcPath));
             if (Files.exists(txtPath)) return Optional.of(Files.readString(txtPath));
         } catch (Exception e) {
-            log.warn("Failed to read local lyrics file for '{}': {}", baseFileName, e.getMessage());
+            log.warn("Failed to read local lyrics file for '{}': {}",
+                    baseFileName, e.getMessage());
         }
         return Optional.empty();
     }
@@ -50,20 +56,26 @@ public class LrcLibClient {
                     .header("User-Agent", "HomeServerManagerBot/1.0")
                     .build();
 
-            HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> res = httpClient.send(
+                    req,
+                    HttpResponse.BodyHandlers.ofString()
+            );
 
             if (res.statusCode() == 200) {
                 JsonNode root = mapper.readTree(res.body());
                 if (root.isArray() && !root.isEmpty()) {
                     JsonNode firstResult = root.get(0);
-                    String synced = firstResult.path("syncedLyrics").asText("");
-                    String plain = firstResult.path("plainLyrics").asText("");
+                    String synced = firstResult.path("syncedLyrics")
+                            .asText("");
+                    String plain = firstResult.path("plainLyrics")
+                            .asText("");
 
                     return !synced.isBlank() ? synced : plain;
                 }
             }
         } catch (Exception e) {
-            log.warn("LRCLIB API failed for '{} - {}': {}", artist, title, e.getMessage());
+            log.warn("LRCLIB API failed for '{} - {}': {}",
+                    artist, title, e.getMessage());
         }
         return "";
     }

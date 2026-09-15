@@ -5,7 +5,10 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import java.io.File;
 
 public interface MessageSender {
-    Integer sendMessage(String chatId, String text, InlineKeyboardMarkup keyboard);
+    Integer sendMessage(String chatId,
+                        String text,
+                        InlineKeyboardMarkup keyboard
+    );
 
     Integer sendMessage(String chatId, String text);
 

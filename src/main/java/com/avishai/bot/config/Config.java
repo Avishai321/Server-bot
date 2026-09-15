@@ -10,6 +10,7 @@ public class Config {
     public static final String BOT_USERNAME = System.getenv("BOT_USERNAME");
     public static final long AUTHORIZED_CHAT_ID = Long.parseLong(
             System.getenv().getOrDefault("AUTHORIZED_CHAT_ID", "0"));
+    public static final String AUTHORIZED_CHAT_ID_STR = String.valueOf(AUTHORIZED_CHAT_ID);
 
     public static final String PROJECT_PATH = "/home/avishai/projects/Server-bot";
     public static final long TELEGRAM_UPDATE_INTERVAL_MS = 2000;

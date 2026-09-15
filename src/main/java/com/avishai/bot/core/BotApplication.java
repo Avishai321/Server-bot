@@ -6,8 +6,8 @@ import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.scheduler.tasks.SpotifyDailySyncTask;
 import com.avishai.bot.services.DockerService;
 import com.avishai.bot.services.NextcloudService;
-import com.avishai.bot.services.spotify.SpotifyService;
 import com.avishai.bot.services.SystemService;
+import com.avishai.bot.services.spotify.SpotifyService;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
@@ -80,7 +80,9 @@ public class BotApplication {
 
     private static void setupNativeMenu(CoreBot bot, List<CommandHandler> handlers) {
         List<BotCommand> commands = handlers.stream()
-                .filter(h -> h.getDescription() != null && !h.getDescription().isBlank())
+                .filter(h -> h.getDescription() != null
+                        && !h.getDescription().isBlank()
+                )
                 .map(h -> new BotCommand(
                         h.getCommandSignature().get(0),
                         h.getDescription()
@@ -88,7 +90,7 @@ public class BotApplication {
                 .toList();
 
         try {
-            BotCommandScopeChat scope = new BotCommandScopeChat(String.valueOf(Config.AUTHORIZED_CHAT_ID));
+            BotCommandScopeChat scope = new BotCommandScopeChat(Config.AUTHORIZED_CHAT_ID_STR);
             bot.execute(new SetMyCommands(commands, scope, null));
         } catch (TelegramApiException e) {
             log.warn("Failed to set native bot commands", e);
