@@ -14,7 +14,7 @@ public class HelpHandler implements CommandHandler {
 
     @Override
     public List<String> getCommandSignature() {
-        return List.of(BotCommands.START, BotCommands.HELP);
+        return List.of(BotCommands.HELP, BotCommands.START);
     }
 
     @Override
