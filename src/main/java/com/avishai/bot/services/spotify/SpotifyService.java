@@ -73,6 +73,16 @@ public class SpotifyService {
         if (!isSyncing.compareAndSet(false, true)) return;
         abortFlag.set(false);
         SpotiSyncState state = new SpotiSyncState();
+
+        if (Config.SPOTIFY_PLAYLISTS.isEmpty()) {
+            state.getGlobalStatus().set("Critical Error");
+            state.getCurrentTrackName().set("playlists.json is missing or empty.");
+            state.getActive().set(false);
+            broadcastState(state, onStateUpdate, true);
+            isSyncing.set(false);
+            return;
+        }
+
         state.setTotalPlaylists(Config.SPOTIFY_PLAYLISTS.size());
 
         try {
