@@ -1,6 +1,6 @@
 package com.avishai.bot.handlers;
 
-import com.avishai.bot.core.CommandContext;
+import com.avishai.bot.routing.CommandContext;
 
 import java.util.List;
 

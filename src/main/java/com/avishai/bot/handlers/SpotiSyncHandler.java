@@ -1,8 +1,8 @@
 package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
-import com.avishai.bot.core.CommandContext;
-import com.avishai.bot.core.TelegramUi;
+import com.avishai.bot.routing.CommandContext;
+import com.avishai.bot.util.TelegramUi;
 import com.avishai.bot.services.spotify.SpotifyService;
 import lombok.RequiredArgsConstructor;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;

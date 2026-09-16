@@ -1,51 +1,56 @@
 package com.avishai.bot.scheduler;
 
+import com.avishai.bot.config.Config;
+import com.avishai.bot.routing.MessageSender;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+
 
 @Slf4j
 public class TaskScheduler {
-    private final ScheduledExecutorService executorService;
-    private final List<ScheduledTask> tasks;
+    private final ScheduledExecutorService executor;
+    private final MessageSender bot;
 
-    public TaskScheduler() {
-        this.executorService = Executors.newScheduledThreadPool(2);
-        this.tasks = new ArrayList<>();
-
-        // Ensure background threads stop cleanly when the bot restarts or updates
+    public TaskScheduler(MessageSender bot) {
+        this.bot = bot;
+        this.executor = Executors.newScheduledThreadPool(2);
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
-    public void registerTask(ScheduledTask task) {
-        tasks.add(task);
-        log.info("Registered scheduled task: {}", task.getTaskName());
-    }
+    public void schedule(BotTask task) {
+        Runnable wrappedTask = () -> {
+            try {
+                log.info("Executing scheduled task: {}", task.getName());
+                task.run();
+                log.info("Completed scheduled task: {}", task.getName());
+            } catch (Exception e) {
+                log.error("Task '{}' crashed!", task.getName(), e);
+                bot.sendMessage(
+                        Config.AUTHORIZED_CHAT_ID_STR,
+                        "<b>Scheduled Task Crash</b>" +
+                                "\nTask: <code>" + task.getName() + "</code>" +
+                                "\nError: " + e.getMessage()
+                );
+            }
+        };
 
-    public void startAll() {
-        for (ScheduledTask task : tasks) {
-            long initialDelay = task.getInitialDelayInSeconds();
-            long period = task.getPeriodInSeconds();
-            executorService.scheduleAtFixedRate(task, initialDelay, period, TimeUnit.SECONDS);
-            log.info("Task '{}' scheduled. Next run in {}s, interval: {}s",
-                    task.getTaskName(), initialDelay, period);
-        }
+        executor.scheduleAtFixedRate(
+                wrappedTask,
+                task.getInitialDelay(),
+                task.getPeriod(),
+                task.getTimeUnit()
+        );
+
+        log.info("Registered task '{}': next run in {} {}",
+                task.getName(), task.getInitialDelay(),
+                task.getTimeUnit().toString().toLowerCase()
+        );
     }
 
     private void shutdown() {
         log.info("Shutting down TaskScheduler gracefully...");
-        executorService.shutdown();
-        try {
-            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                executorService.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executorService.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
+        executor.shutdownNow();
     }
 }

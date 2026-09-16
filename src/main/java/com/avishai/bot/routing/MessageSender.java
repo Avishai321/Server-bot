@@ -1,4 +1,4 @@
-package com.avishai.bot.core;
+package com.avishai.bot.routing;
 
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 

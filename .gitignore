@@ -10,4 +10,4 @@ Thumbs.db
 *.properties
 
 .env
-src/main/java/com/avishai/bot/config/playlists.json
+config/playlists.json

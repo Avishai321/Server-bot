@@ -1,4 +1,4 @@
-package com.avishai.bot.core;
+package com.avishai.bot.util;
 
 import lombok.experimental.UtilityClass;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;

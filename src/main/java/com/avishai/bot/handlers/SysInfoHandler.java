@@ -1,7 +1,7 @@
 package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
-import com.avishai.bot.core.CommandContext;
+import com.avishai.bot.routing.CommandContext;
 import com.avishai.bot.services.SystemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

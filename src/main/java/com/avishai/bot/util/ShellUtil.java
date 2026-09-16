@@ -1,4 +1,4 @@
-package com.avishai.bot.services;
+package com.avishai.bot.util;
 
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +10,7 @@ import java.util.List;
 
 @Slf4j
 @UtilityClass
-public class ShellExecutionService {
+public class ShellUtil {
     public static ShellResponse execute(List<String> command, File directory) {
         StringBuilder output = new StringBuilder();
         StringBuilder error = new StringBuilder();

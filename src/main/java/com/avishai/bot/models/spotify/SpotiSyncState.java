@@ -1,6 +1,6 @@
 package com.avishai.bot.models.spotify;
 
-import com.avishai.bot.core.TelegramUi;
+import com.avishai.bot.util.TelegramUi;
 import lombok.Data;
 
 import java.util.concurrent.atomic.AtomicBoolean;

@@ -1,10 +1,12 @@
 package com.avishai.bot.services;
 
+import com.avishai.bot.util.ShellUtil;
+
 import java.util.List;
 
 public class DockerService {
     public String[] listContainers() {
-        var response = ShellExecutionService.execute(List.of(
+        var response = ShellUtil.execute(List.of(
                 "docker", "ps", "--format", "{{.Names}}")
         );
 
@@ -14,7 +16,7 @@ public class DockerService {
     }
 
     public String getContainerStatus(String name) {
-        var response = ShellExecutionService.execute(List.of(
+        var response = ShellUtil.execute(List.of(
                 "docker", "ps", "--filter",
                 "name=^/" + name + "$", "--format", "{{.Status}}")
         );
@@ -24,12 +26,12 @@ public class DockerService {
                 "Offline / Exited";
     }
 
-    public ShellExecutionService.ShellResponse restartContainer(String name) {
-        return ShellExecutionService.execute(List.of("docker", "restart", name));
+    public ShellUtil.ShellResponse restartContainer(String name) {
+        return ShellUtil.execute(List.of("docker", "restart", name));
     }
 
-    public ShellExecutionService.ShellResponse getLogs(String name, int lines) {
-        return ShellExecutionService.execute(List.of(
+    public ShellUtil.ShellResponse getLogs(String name, int lines) {
+        return ShellUtil.execute(List.of(
                 "docker", "logs", "--tail", String.valueOf(lines), name)
         );
     }
