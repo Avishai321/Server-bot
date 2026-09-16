@@ -44,7 +44,7 @@ public class SpotiSyncTask implements BotTask {
         }
 
         Integer msgId = bot.sendMessage(
-                Config.AUTHORIZED_CHAT_ID_STR,
+                Config.AUTHORIZED_CHAT_ID,
                 "<b>Automated System Event</b>\nInitiating scheduled Spotisync...",
                 TelegramUi.singleButtonKeyboard("Abort", BotCommands.STOP_SPOTIFY_BACKUP)
         );
@@ -55,7 +55,7 @@ public class SpotiSyncTask implements BotTask {
                     : null;
 
             if (msgId != null) bot.editMessage(
-                    Config.AUTHORIZED_CHAT_ID_STR,
+                    Config.AUTHORIZED_CHAT_ID,
                     msgId,
                     state.renderCard(),
                     keyboard

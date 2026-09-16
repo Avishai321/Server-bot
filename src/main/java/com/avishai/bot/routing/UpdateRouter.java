@@ -38,7 +38,7 @@ public class UpdateRouter {
 
         String chatIdStr = String.valueOf(incomingChatId);
 
-        if (incomingChatId != Config.AUTHORIZED_CHAT_ID) {
+        if (!chatIdStr.equals(Config.AUTHORIZED_CHAT_ID)) {
             log.warn("Unauthorized access attempt from Chat ID: {}", incomingChatId);
             return;
         }

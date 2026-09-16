@@ -16,8 +16,7 @@ public class Config {
     public static final String BOT_TOKEN = System.getenv("BOT_TOKEN");
     public static final String BOT_USERNAME = System.getenv("BOT_USERNAME");
 
-    public static final String AUTHORIZED_CHAT_ID_STR = System.getenv("AUTHORIZED_CHAT_ID");
-    public static final long AUTHORIZED_CHAT_ID = Long.parseLong(AUTHORIZED_CHAT_ID_STR);
+    public static final String AUTHORIZED_CHAT_ID = System.getenv("AUTHORIZED_CHAT_ID");
 
     public static final String PROJECT_PATH = System.getenv("PROJECT_PATH");
     public static final String MUSIC_STORAGE_ROOT = System.getenv("MUSIC_STORAGE_ROOT");

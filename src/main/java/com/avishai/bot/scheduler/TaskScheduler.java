@@ -28,7 +28,7 @@ public class TaskScheduler {
             } catch (Exception e) {
                 log.error("Task '{}' crashed!", task.getName(), e);
                 bot.sendMessage(
-                        Config.AUTHORIZED_CHAT_ID_STR,
+                        Config.AUTHORIZED_CHAT_ID,
                         "<b>Scheduled Task Crash</b>" +
                                 "\nTask: <code>" + task.getName() + "</code>" +
                                 "\nError: " + e.getMessage()

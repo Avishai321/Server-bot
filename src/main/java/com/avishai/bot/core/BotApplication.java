@@ -59,7 +59,7 @@ public class BotApplication {
         new TelegramBotsApi(DefaultBotSession.class).registerBot(bot);
         setupNativeMenu(bot, handlers);
 
-        bot.sendMessage(Config.AUTHORIZED_CHAT_ID_STR, "  <b>System Boot</b>\nDaemon online.");
+        bot.sendMessage(Config.AUTHORIZED_CHAT_ID, "  <b>System Boot</b>\nDaemon online.");
         log.info("Telegram Bot API successfully registered and running.");
     }
 
@@ -73,7 +73,7 @@ public class BotApplication {
                 .toList();
 
         try {
-            BotCommandScopeChat scope = new BotCommandScopeChat(Config.AUTHORIZED_CHAT_ID_STR);
+            BotCommandScopeChat scope = new BotCommandScopeChat(Config.AUTHORIZED_CHAT_ID);
             bot.execute(new SetMyCommands(commands, scope, null));
         } catch (TelegramApiException e) {
             log.warn("Failed to set native bot commands", e);

@@ -44,7 +44,7 @@ public class NextcloudIndexTask implements BotTask {
 
         log.info("Triggering scheduled Nextcloud index scan.");
         bot.sendMessage(
-                Config.AUTHORIZED_CHAT_ID_STR,
+                Config.AUTHORIZED_CHAT_ID,
                 "<b>Automated System Event</b>" +
                         "\nStarting routine Nextcloud background scan..."
         );
@@ -57,7 +57,7 @@ public class NextcloudIndexTask implements BotTask {
             );
 
             bot.sendMessage(
-                    Config.AUTHORIZED_CHAT_ID_STR,
+                    Config.AUTHORIZED_CHAT_ID,
                     "<b>Scan Failed</b>" +
                             "\nNextcloud routine scan exited with code " + result.exitCode()
             );
