@@ -19,14 +19,26 @@ public class NextcloudService {
     }
 
     public NextcloudSyncResult runOccScan(Path targetPath) {
+        return executeOccCommand(formatOccCommand(targetPath));
+    }
+
+    public NextcloudSyncResult runOccMusicScan() {
+        return executeOccCommand("php occ music:scan --all");
+    }
+
+    public NextcloudSyncResult runOccPlaylistImport(String targetUser, String relativePath) {
+        return executeOccCommand(String.format(
+                "php occ music:playlist-import %s --file=\"%s\" --overwrite",
+                targetUser, relativePath
+        ));
+    }
+
+    private NextcloudSyncResult executeOccCommand(String occCommand) {
         if (!isIndexing.compareAndSet(false, true)) {
             return new NextcloudSyncResult(-1, "Process already running.");
         }
-        try {
-            String occCommand = formatOccCommand(targetPath);
 
-            // Trick: Pipe to cat to force non-interactive mode and disable the messy progress bar.
-            // pipefail ensures we don't lose the exit code if the occ command crashes.
+        try {
             List<String> command = List.of(
                     "docker", "exec", "--user", "www-data",
                     "nextcloud-server-app-1", "bash", "-c",
@@ -42,14 +54,17 @@ public class NextcloudService {
                     currentProcess.getInputStream().readAllBytes(),
                     StandardCharsets.UTF_8
             );
+
             int exitCode = currentProcess.waitFor();
 
             // Fix: Broaden regex to strip ALL ANSI cursor movements, not just color codes
-            String cleanOutput = rawOutput.replaceAll("\u001B\\[[;\\d]*[a-zA-Z]", "").trim();
+            String cleanOutput = rawOutput
+                    .replaceAll("\u001B\\[[;\\d]*[a-zA-Z]", "")
+                    .trim();
 
             return new NextcloudSyncResult(exitCode, cleanOutput);
         } catch (Exception e) {
-            log.error("OCC Scan failed", e);
+            log.error("OCC execution failed for command: {}", occCommand, e);
             return new NextcloudSyncResult(-1, e.getMessage());
         } finally {
             currentProcess = null;
@@ -66,9 +81,14 @@ public class NextcloudService {
                     "nextcloud-server-app-1", "pkill", "-f", "occ files:scan"
             ).start().waitFor();
 
+            new ProcessBuilder(
+                    "docker", "exec", "--user", "www-data",
+                    "nextcloud-server-app-1", "pkill", "-f", "occ music:scan"
+            ).start().waitFor();
+
             currentProcess.destroyForcibly();
         } catch (Exception e) {
-            log.error("Failed to kill container process", e);
+            log.error("Failed to kill container processes", e);
         }
     }
 
@@ -93,5 +113,6 @@ public class NextcloudService {
         return "php occ files:scan --path=\"" + nextcloudPath + "\"";
     }
 
-    public record NextcloudSyncResult(int exitCode, String output) {}
+    public record NextcloudSyncResult(int exitCode, String output) {
+    }
 }

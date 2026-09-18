@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -158,6 +159,7 @@ public class SpotifyService {
 
         try {
             CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0])).join();
+            generateM3uPlaylist(targetDir, target.folderName());
         } catch (CompletionException e) {
             if (abortFlag.get()) log.info("Sync interrupted via abort flag.");
             else throw e;
@@ -247,16 +249,60 @@ public class SpotifyService {
         }
     }
 
-    private void executeNextcloudScan() {
-        log.info("Spotify sync completed. Triggering automatic Nextcloud index scan...");
+    private void generateM3uPlaylist(Path targetDir, String playlistName) {
         try {
-            Path musicRootPath = Paths.get(Config.MUSIC_STORAGE_ROOT);
-            var scanResult = nextcloudService.runOccScan(musicRootPath);
-            log.info("Nextcloud auto-index finished with exit code {}: \n{}",
-                    scanResult.exitCode(), scanResult.output());
+            Path m3uPath = targetDir.resolve(playlistName + ".m3u");
+            List<String> lines = new ArrayList<>();
+            lines.add("#EXTM3U");
+
+            getExistingFiles(targetDir).stream()
+                    .filter(f -> f.endsWith(".m4a"))
+                    .sorted()
+                    .forEach(lines::add);
+
+            Files.write(m3uPath, lines);
+            log.info("Generated M3U playlist file: {}", m3uPath.getFileName());
         } catch (Exception e) {
-            log.error("Failed to execute automatic Nextcloud index scan", e);
+            log.error("Failed to generate .m3u playlist", e);
         }
+    }
+
+    private void executeNextcloudScan() {
+        log.info("Spotify sync completed. Triggering automatic Nextcloud index scans...");
+        try {
+            var musicRootPath = Paths.get(Config.MUSIC_STORAGE_ROOT);
+
+            var fileScanResult = nextcloudService.runOccScan(musicRootPath);
+            log.info("Nextcloud file auto-index finished with exit code {}:\n{}",
+                    fileScanResult.exitCode(), fileScanResult.output());
+
+            var musicScanResult = nextcloudService.runOccMusicScan();
+            log.info("Nextcloud Music DB auto-index finished with exit code {}:\n{}",
+                    musicScanResult.exitCode(), musicScanResult.output());
+
+            PlaylistManager.getInstance()
+                    .getPlaylists()
+                    .forEach(this::importNextcloudPlaylist);
+
+        } catch (Exception e) {
+            log.error("Failed to execute automatic Nextcloud index scans", e);
+        }
+    }
+
+    private void importNextcloudPlaylist(PlaylistManager.SpotifyTarget target) {
+        String folder = target.folderName();
+        String relativeM3uPath = String.format("Music/%s/%s.m3u", folder, folder);
+
+        var importResult = nextcloudService.runOccPlaylistImport(
+                "Avishai",
+                relativeM3uPath
+        );
+
+        if (importResult.exitCode() == 0) {
+            log.info("Successfully imported playlist: {}", folder);
+        } else log.error("Failed to import playlist {}:\n{}",
+                folder, importResult.output()
+        );
     }
 
     private void cleanupTempFile(Path tempFile) {
