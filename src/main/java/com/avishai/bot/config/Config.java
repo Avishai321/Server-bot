@@ -1,11 +1,9 @@
 package com.avishai.bot.config;
 
 import lombok.experimental.UtilityClass;
-import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.Paths;
 
-@Slf4j
 @UtilityClass
 public class Config {
     public static final String BOT_TOKEN = System.getenv("BOT_TOKEN");

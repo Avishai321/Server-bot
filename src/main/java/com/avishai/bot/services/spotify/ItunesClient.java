@@ -1,13 +1,13 @@
 package com.avishai.bot.services.spotify;
 
+import com.avishai.bot.network.NetworkManager;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -18,8 +18,7 @@ import java.util.Optional;
 @Slf4j
 @RequiredArgsConstructor
 public class ItunesClient {
-    private final HttpClient httpClient;
-    private final ObjectMapper mapper;
+    private final NetworkManager network;
 
     public ItunesMetadata fetchItunesMetadata(String artist, String title) {
         return fetchRawJson(artist, title)
@@ -39,16 +38,18 @@ public class ItunesClient {
                     .header("User-Agent", "Mozilla/5.0")
                     .build();
 
-            HttpResponse<String> res = httpClient.send(
+            HttpResponse<InputStream> res = network.getHttpClient().send(
                     req,
-                    HttpResponse.BodyHandlers.ofString()
+                    HttpResponse.BodyHandlers.ofInputStream()
             );
 
             if (res.statusCode() == 200) {
-                JsonNode root = mapper.readTree(res.body());
-                JsonNode results = root.path("results");
-                if (results.isArray() && !results.isEmpty()) {
-                    return Optional.of(results.get(0));
+                try (InputStream stream = res.body()) {
+                    JsonNode root = network.getObjectMapper().readTree(stream);
+                    JsonNode results = root.path("results");
+                    if (results.isArray() && !results.isEmpty()) {
+                        return Optional.of(results.get(0));
+                    }
                 }
             }
         } catch (Exception e) {
@@ -85,7 +86,12 @@ public class ItunesClient {
                             "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     .header("Accept", "image/*")
                     .build();
-            var res = httpClient.send(req, HttpResponse.BodyHandlers.ofFile(targetPath));
+
+            var res = network.getHttpClient().send(
+                    req,
+                    HttpResponse.BodyHandlers.ofFile(targetPath)
+            );
+
             if (res.statusCode() != 200) return false;
             if (!Files.exists(targetPath) || Files.size(targetPath) == 0) return false;
 

@@ -4,15 +4,12 @@ import com.avishai.bot.config.Config;
 import com.avishai.bot.models.spotify.SpotiSyncState;
 import com.avishai.bot.models.spotify.SpotifyResponses;
 import com.avishai.bot.services.NextcloudService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
-import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -27,33 +24,29 @@ import java.util.stream.Stream;
 
 @Slf4j
 public class SpotifyService {
-    private final AtomicBoolean isSyncing = new AtomicBoolean(false);
-    private final AtomicBoolean abortFlag = new AtomicBoolean(false);
-
     private final NextcloudService nextcloudService;
-    private final ExecutorService downloadPool;
-
     private final SpotifyScraper scraper;
     private final ItunesClient itunesClient;
     private final LrcLibClient lrcLibClient;
     private final MediaProcessRunner processRunner;
+    private final ExecutorService downloadPool;
 
+    private final AtomicBoolean isSyncing = new AtomicBoolean(false);
+    private final AtomicBoolean abortFlag = new AtomicBoolean(false);
     private long lastUiUpdateTime = 0;
 
-    public SpotifyService(NextcloudService nextcloudService) {
+    public SpotifyService(NextcloudService nextcloudService,
+                          SpotifyScraper scraper,
+                          ItunesClient itunesClient,
+                          LrcLibClient lrcLibClient,
+                          MediaProcessRunner processRunner,
+                          int threadCount) {
         this.nextcloudService = nextcloudService;
-        this.downloadPool = Executors.newFixedThreadPool(Config.SPOTIFY_DOWNLOAD_THREADS);
-
-        HttpClient sharedClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
-        ObjectMapper sharedMapper = new ObjectMapper();
-
-        this.scraper = new SpotifyScraper(sharedClient, sharedMapper);
-        this.itunesClient = new ItunesClient(sharedClient, sharedMapper);
-        this.lrcLibClient = new LrcLibClient(sharedClient, sharedMapper);
-        this.processRunner = new MediaProcessRunner();
+        this.scraper = scraper;
+        this.itunesClient = itunesClient;
+        this.lrcLibClient = lrcLibClient;
+        this.processRunner = processRunner;
+        this.downloadPool = Executors.newFixedThreadPool(threadCount);
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::abortSync));
     }

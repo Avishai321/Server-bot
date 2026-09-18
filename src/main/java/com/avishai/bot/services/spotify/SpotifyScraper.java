@@ -1,12 +1,11 @@
 package com.avishai.bot.services.spotify;
 
 import com.avishai.bot.models.spotify.SpotifyResponses;
+import com.avishai.bot.network.NetworkManager;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
@@ -25,8 +24,7 @@ public class SpotifyScraper {
     private static final Pattern INITIAL_STATE_PATTERN =
             Pattern.compile("<script id=\"initial-state\" type=\"text/plain\">(.*?)</script>");
 
-    private final HttpClient httpClient;
-    private final ObjectMapper mapper;
+    private final NetworkManager network;
 
     public List<SpotifyResponses.Track> extractTracks(
             String link,
@@ -44,7 +42,7 @@ public class SpotifyScraper {
             throw new IllegalStateException("Could not locate JSON metadata inside the HTML.");
         }
 
-        JsonNode root = mapper.readTree(jsonPayload);
+        JsonNode root = network.getObjectMapper().readTree(jsonPayload);
         List<SpotifyResponses.Track> allTracks = new ArrayList<>();
         findTracksRecursively(root, allTracks);
         return allTracks;
@@ -59,7 +57,7 @@ public class SpotifyScraper {
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                 .header("Accept-Language", "en-US,en;q=0.9")
                 .build();
-        var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        var response = network.getHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IllegalStateException("Failed to load HTML. HTTP " + response.statusCode());
         }

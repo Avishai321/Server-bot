@@ -2,6 +2,7 @@ package com.avishai.bot.core;
 
 import com.avishai.bot.config.Config;
 import com.avishai.bot.handlers.*;
+import com.avishai.bot.network.NetworkManager;
 import com.avishai.bot.routing.UpdateRouter;
 import com.avishai.bot.scheduler.NextcloudIndexTask;
 import com.avishai.bot.scheduler.SpotiSyncTask;
@@ -9,7 +10,7 @@ import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.services.DockerService;
 import com.avishai.bot.services.NextcloudService;
 import com.avishai.bot.services.SystemService;
-import com.avishai.bot.services.spotify.SpotifyService;
+import com.avishai.bot.services.spotify.*;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
@@ -27,12 +28,24 @@ public class BotApplication {
     public static void start() throws Exception {
         validateEnvironment();
 
-        // Initialize Services
+        // Core Infrastructure
         ExecutorService globalExecutor = Executors.newCachedThreadPool();
+        NetworkManager networkManager = new NetworkManager(globalExecutor);
+
+        // Base Services
         NextcloudService nextcloudService = new NextcloudService();
-        SpotifyService spotifyService = new SpotifyService(nextcloudService);
         SystemService systemService = new SystemService();
         DockerService dockerService = new DockerService();
+
+        // Spotify
+        SpotifyService spotifyService = new SpotifyService(
+                nextcloudService,
+                new SpotifyScraper(networkManager),
+                new ItunesClient(networkManager),
+                new LrcLibClient(networkManager),
+                new MediaProcessRunner(),
+                Config.SPOTIFY_DOWNLOAD_THREADS
+        );
 
         // Initialize Bot & Router
         CoreBot bot = new CoreBot(Config.BOT_USERNAME, Config.BOT_TOKEN);
@@ -47,6 +60,7 @@ public class BotApplication {
                 new DockerManagerHandler(globalExecutor, dockerService),
                 new UpdateBotHandler(globalExecutor, systemService)
         );
+
         router.registerCommand(new HelpHandler(handlers));
         handlers.forEach(router::registerCommand);
 

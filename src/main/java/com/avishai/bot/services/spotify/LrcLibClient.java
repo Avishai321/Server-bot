@@ -1,13 +1,13 @@
 package com.avishai.bot.services.spotify;
 
+import com.avishai.bot.network.NetworkManager;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -18,8 +18,7 @@ import java.util.Optional;
 @Slf4j
 @RequiredArgsConstructor
 public class LrcLibClient {
-    private final HttpClient httpClient;
-    private final ObjectMapper mapper;
+    private final NetworkManager network;
 
     public String fetchLyrics(
             String artist,
@@ -56,21 +55,24 @@ public class LrcLibClient {
                     .header("User-Agent", "HomeServerManagerBot/1.0")
                     .build();
 
-            HttpResponse<String> res = httpClient.send(
+            HttpResponse<InputStream> res = network.getHttpClient().send(
                     req,
-                    HttpResponse.BodyHandlers.ofString()
+                    HttpResponse.BodyHandlers.ofInputStream()
             );
 
             if (res.statusCode() == 200) {
-                JsonNode root = mapper.readTree(res.body());
-                if (root.isArray() && !root.isEmpty()) {
-                    JsonNode firstResult = root.get(0);
-                    String synced = firstResult.path("syncedLyrics")
-                            .asText("");
-                    String plain = firstResult.path("plainLyrics")
-                            .asText("");
+                try (InputStream stream = res.body()) {
+                    JsonNode root = network.getObjectMapper().readTree(stream);
+                    if (root.isArray() && !root.isEmpty()) {
+                        JsonNode firstResult = root.get(0);
 
-                    return !synced.isBlank() ? synced : plain;
+                        String synced = firstResult.path("syncedLyrics")
+                                .asText("");
+                        String plain = firstResult.path("plainLyrics")
+                                .asText("");
+
+                        return !synced.isBlank() ? synced : plain;
+                    }
                 }
             }
         } catch (Exception e) {
