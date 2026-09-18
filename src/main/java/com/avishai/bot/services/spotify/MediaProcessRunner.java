@@ -30,7 +30,40 @@ public class MediaProcessRunner {
             Path errorLog
     ) throws Exception {
 
-        String searchQuery = String.format("ytsearch1:%s %s audio", artist, title);
+        String primaryArtist = artist.split(",")[0].trim();
+
+        String safeArtist = primaryArtist
+                .replaceAll("[^a-zA-Z0-9\\p{IsHebrew}\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        String safeTitle = title
+                .replaceAll("[^a-zA-Z0-9\\p{IsHebrew}\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        // Attempt 1: Artist + Title
+        String primaryQuery = String.format("ytsearch1:%s %s audio", safeArtist, safeTitle)
+                .replaceAll("\\s+", " ");
+
+        boolean success = runYtDlpProcess(primaryQuery, tempAudio, errorLog);
+
+        // Attempt 2: Fallback to Title-only if Attempt 1 found 0 results
+        if (!success) {
+            log.warn("[yt-dlp] Primary search yielded 0 files for '{} - {}'. " +
+                            "Falling back to Title-only search.",
+                    artist, title
+            );
+            Files.deleteIfExists(tempAudio);
+            String fallbackQuery = String.format("ytsearch1:%s audio", safeTitle)
+                    .replaceAll("\\s+", " ");
+            success = runYtDlpProcess(fallbackQuery, tempAudio, errorLog);
+        }
+
+        return success;
+    }
+
+    private boolean runYtDlpProcess(String searchQuery, Path tempAudio, Path errorLog) throws Exception {
         String userHome = System.getProperty("user.home");
         String denoPath = userHome + "/.deno/bin/deno";
 
@@ -57,12 +90,12 @@ public class MediaProcessRunner {
 
         if (!finished) {
             process.destroyForcibly();
-            log.error("[yt-dlp] Timeout (15m) for '{} - {}'. Process killed.",
-                    artist, title
-            );
             return false;
         }
-        return process.exitValue() == 0;
+
+        return process.exitValue() == 0
+                && Files.exists(tempAudio)
+                && Files.size(tempAudio) > 0;
     }
 
     public boolean executeFfmpeg(
