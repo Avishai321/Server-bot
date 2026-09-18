@@ -74,7 +74,9 @@ public class SpotifyService {
         abortFlag.set(false);
         SpotiSyncState state = new SpotiSyncState();
 
-        if (Config.SPOTIFY_PLAYLISTS.isEmpty()) {
+        List<PlaylistManager.SpotifyTarget> playlists = PlaylistManager.getInstance().getPlaylists();
+
+        if (playlists.isEmpty()) {
             state.getGlobalStatus().set("Critical Error");
             state.getCurrentTrackName().set("playlists.json is missing or empty.");
             state.getActive().set(false);
@@ -83,12 +85,12 @@ public class SpotifyService {
             return;
         }
 
-        state.setTotalPlaylists(Config.SPOTIFY_PLAYLISTS.size());
+        state.setTotalPlaylists(playlists.size());
 
         try {
-            for (int i = 0; i < Config.SPOTIFY_PLAYLISTS.size(); i++) {
+            for (int i = 0; i < playlists.size(); i++) {
                 if (abortFlag.get()) break;
-                Config.SpotifyTarget target = Config.SPOTIFY_PLAYLISTS.get(i);
+                PlaylistManager.SpotifyTarget target = playlists.get(i);
                 log.info("=== Starting Sync for Folder: {} ===", target.folderName());
 
                 state.setCurrentPlaylistNum(i + 1);
@@ -117,7 +119,7 @@ public class SpotifyService {
         }
     }
 
-    private void processPlaylist(Config.SpotifyTarget target,
+    private void processPlaylist(PlaylistManager.SpotifyTarget target,
                                  SpotiSyncState state,
                                  Consumer<SpotiSyncState> onUiUpdate) throws Exception {
 
