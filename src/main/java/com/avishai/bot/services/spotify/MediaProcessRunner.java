@@ -30,9 +30,7 @@ public class MediaProcessRunner {
             Path errorLog
     ) throws Exception {
 
-        String searchQuery = String.format("ytsearch1:\"%s\" \"%s\" audio",
-                artist, title
-        );
+        String searchQuery = String.format("ytsearch1:%s %s audio", artist, title);
         String userHome = System.getProperty("user.home");
         String denoPath = userHome + "/.deno/bin/deno";
 
@@ -67,7 +65,6 @@ public class MediaProcessRunner {
         return process.exitValue() == 0;
     }
 
-    // ... inside MediaProcessRunner.java
     public boolean executeFfmpeg(
             SpotifyResponses.Track track,
             Path tempAudio,
