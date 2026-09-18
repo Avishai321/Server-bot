@@ -4,6 +4,7 @@ import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.routing.CommandContext;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,33 +43,29 @@ public class HelpHandler implements CommandHandler {
                 .filter(h -> !h.getDescription().isEmpty())
                 .collect(Collectors.groupingBy(CommandHandler::getCategory));
 
-        StringBuilder helpText = new StringBuilder();
-        helpText.append("""
-                🤖 <b>Home Server Manager</b>
-                
-                Select a command below or use the native Menu button.
-                
-                """);
+        String body = Arrays.stream(HandlerCategory.values())
+                .filter(groupedHandlers::containsKey)
+                .map(category -> buildCategorySection(
+                        category,
+                        groupedHandlers.get(category))
+                )
+                .collect(Collectors.joining("\n"));
 
-        // Iterate over Enum.values() to enforce consistent, predictable rendering order
-        for (HandlerCategory category : HandlerCategory.values()) {
-            List<CommandHandler> handlers = groupedHandlers.get(category);
+        ctx.reply("<b>Home Server Manager</b>\n\n" + body +
+                "\nType <code>/help [command]</code> for advanced syntax.");
+    }
 
-            if (handlers != null && !handlers.isEmpty()) {
-                helpText.append("<b>").append(category.getDisplayName()).append("</b>\n");
+    private String buildCategorySection(HandlerCategory category, List<CommandHandler> handlers) {
+        String header = "<b>" + category.getDisplayName() + "</b>\n";
 
-                for (CommandHandler handler : handlers) {
-                    helpText.append(handler.getCommandSignature().get(0))
-                            .append(" - ")
-                            .append(handler.getDescription())
-                            .append("\n");
-                }
-                helpText.append("\n");
-            }
-        }
+        String commands = handlers.stream()
+                .map(h -> h.getCommandSignature().get(0)
+                        + " - "
+                        + h.getDescription()
+                )
+                .collect(Collectors.joining("\n"));
 
-        helpText.append("💡 Type <code>/help [command]</code> for advanced syntax.");
-        ctx.reply(helpText.toString());
+        return header + commands + "\n";
     }
 
     private void sendDetailedHelp(CommandContext ctx, String topic) {
