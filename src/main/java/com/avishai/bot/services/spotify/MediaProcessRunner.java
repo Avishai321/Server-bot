@@ -16,7 +16,9 @@ public class MediaProcessRunner {
     private final Set<Process> activeProcesses = ConcurrentHashMap.newKeySet();
 
     public static String cleanMetadataString(String input) {
-        return input == null ? "" : input.replace("\"", "");
+        return input == null
+                ? ""
+                : input.replace("\"", "");
     }
 
     public void abortAll() {
@@ -29,7 +31,6 @@ public class MediaProcessRunner {
             Path tempAudio,
             Path errorLog
     ) throws Exception {
-
         String primaryArtist = artist.split(",")[0].trim();
 
         String safeArtist = primaryArtist
@@ -63,7 +64,37 @@ public class MediaProcessRunner {
         return success;
     }
 
-    private boolean runYtDlpProcess(String searchQuery, Path tempAudio, Path errorLog) throws Exception {
+    private boolean runManagedProcess(List<String> command,
+                                      Path errorLog,
+                                      long timeout,
+                                      String processType,
+                                      String identifier) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(command)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(errorLog.toFile());
+
+        setupProcessEnvironment(pb);
+
+        Process process = pb.start();
+        activeProcesses.add(process);
+
+        try {
+            boolean finished = process.waitFor(timeout, TimeUnit.MINUTES);
+            if (!finished) {
+                log.error("[{}] Timeout ({} {}) for '{}'. Process killed.",
+                        processType, timeout, TimeUnit.MINUTES.name().toLowerCase(), identifier);
+                return false;
+            }
+            return process.exitValue() == 0;
+        } finally {
+            activeProcesses.remove(process);
+            if (process.isAlive()) process.destroyForcibly();
+        }
+    }
+
+    private boolean runYtDlpProcess(String searchQuery,
+                                    Path tempAudio,
+                                    Path errorLog) throws Exception {
         String userHome = System.getProperty("user.home");
         String denoPath = userHome + "/.deno/bin/deno";
 
@@ -78,22 +109,15 @@ public class MediaProcessRunner {
                 searchQuery
         ));
 
-        var pb = new ProcessBuilder(command)
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                .redirectError(errorLog.toFile());
-        setupProcessEnvironment(pb);
+        boolean success = runManagedProcess(
+                command,
+                errorLog,
+                15,
+                "yt-dlp",
+                searchQuery
+        );
 
-        Process process = pb.start();
-        activeProcesses.add(process);
-        boolean finished = process.waitFor(15, TimeUnit.MINUTES);
-        activeProcesses.remove(process);
-
-        if (!finished) {
-            process.destroyForcibly();
-            return false;
-        }
-
-        return process.exitValue() == 0
+        return success
                 && Files.exists(tempAudio)
                 && Files.size(tempAudio) > 0;
     }
@@ -137,9 +161,7 @@ public class MediaProcessRunner {
                     "-c:v", "mjpeg",
                     "-disposition:v", "attached_pic"
             ));
-        } else {
-            command.addAll(List.of("-c", "copy"));
-        }
+        } else command.addAll(List.of("-c", "copy"));
 
         appendMetadata(command, "title", title);
         appendMetadata(command, "artist", artist);
@@ -164,23 +186,14 @@ public class MediaProcessRunner {
 
         command.add(finalOutputPath.toString());
 
-        ProcessBuilder pb = new ProcessBuilder(command)
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                .redirectError(errorLog.toFile());
-        setupProcessEnvironment(pb);
-
-        Process process = pb.start();
-        activeProcesses.add(process);
-        boolean finished = process.waitFor(5, TimeUnit.MINUTES);
-        activeProcesses.remove(process);
-
-        if (!finished) {
-            process.destroyForcibly();
-            log.error("[ffmpeg] Timeout (5m) for '{} - {}'. Process killed.",
-                    artist, title);
-            return false;
-        }
-        return process.exitValue() == 0;
+        String identifier = artist + " - " + title;
+        return runManagedProcess(
+                command,
+                errorLog,
+                5,
+                "ffmpeg",
+                identifier
+        );
     }
 
     private void appendMetadata(List<String> command, String key, String value) {
