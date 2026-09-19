@@ -155,8 +155,13 @@ public class FolderIndexHandler implements CommandHandler {
                 );
             }, 1, 1, TimeUnit.SECONDS);
 
-            result = nextcloudService.runOccScan(targetPath);
-            uiScheduler.shutdownNow();
+            try {
+                result = nextcloudService.runOccScan(targetPath);
+            } catch (Exception e) {
+                log.error("Indexing process crashed for target: {}", targetPath, e);
+                ctx.edit(messageId, "<b>Indexing Failed:</b>\n" + e.getMessage());
+                return;
+            }
         }
         renderFinalState(ctx, messageId, targetPath, result);
     }

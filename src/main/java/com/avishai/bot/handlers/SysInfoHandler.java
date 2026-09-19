@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 @Slf4j
@@ -34,9 +35,8 @@ public class SysInfoHandler implements CommandHandler {
     public void handle(CommandContext ctx) {
         Integer msgId = ctx.reply("🔍 <i>Gathering hardware telemetry...</i>");
 
-        executorService.submit(() -> {
-            try {
-                String uiCard = String.format("""
+        CompletableFuture.runAsync(() -> {
+            String uiCard = String.format("""
                                  🖥️ <b>Server Health Dashboard</b>
                                 \s
                                  ⏱️ <b>Uptime:</b> <code>%s</code>
@@ -48,15 +48,15 @@ public class SysInfoHandler implements CommandHandler {
                                  <code>%s</code>
                                 \s
                                  <i>✅ All systems operational</i>""",
-                        systemService.getUptime(),
-                        systemService.getRamUsage(),
-                        systemService.getDiskUsage()
-                );
-                ctx.edit(msgId, uiCard);
-            } catch (Exception e) {
-                log.error("Failed to fetch system info", e);
-                ctx.edit(msgId, "❌ <b>Error fetching telemetry:</b>\n" + e.getMessage());
-            }
+                    systemService.getUptime(),
+                    systemService.getRamUsage(),
+                    systemService.getDiskUsage()
+            );
+            ctx.edit(msgId, uiCard);
+        }, executorService).exceptionally(ex -> {
+            log.error("Failed to fetch system info", ex);
+            ctx.edit(msgId, "<b>System Fault:</b>\n" + ex.getMessage());
+            return null;
         });
     }
 }
