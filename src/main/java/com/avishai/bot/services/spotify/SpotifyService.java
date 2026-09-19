@@ -46,12 +46,7 @@ public class SpotifyService {
         this.itunesClient = itunesClient;
         this.lrcLibClient = lrcLibClient;
         this.processRunner = processRunner;
-
         this.downloadPool = Executors.newFixedThreadPool(threadCount);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            abortSync();
-            this.downloadPool.shutdownNow();
-        }));
     }
 
     public boolean isBusy() {
@@ -348,6 +343,13 @@ public class SpotifyService {
         if (force || now - lastUiUpdateTime > Config.TELEGRAM_UPDATE_INTERVAL_MS) {
             onUiUpdate.accept(state);
             lastUiUpdateTime = now;
+        }
+    }
+
+    public void shutdown() {
+        abortSync();
+        if (downloadPool != null && !downloadPool.isShutdown()) {
+            downloadPool.shutdownNow();
         }
     }
 }

@@ -8,6 +8,7 @@ import com.avishai.bot.scheduler.NextcloudIndexTask;
 import com.avishai.bot.scheduler.SpotiSyncTask;
 import com.avishai.bot.scheduler.TaskScheduler;
 import com.avishai.bot.services.DockerService;
+import com.avishai.bot.services.LiveLogServer;
 import com.avishai.bot.services.NextcloudService;
 import com.avishai.bot.services.SystemService;
 import com.avishai.bot.services.spotify.*;
@@ -30,7 +31,6 @@ public class BotApplication {
 
         // Core Infrastructure
         ExecutorService globalExecutor = Executors.newFixedThreadPool(Config.GLOBAL_EXECUTOR_THREADS);
-        Runtime.getRuntime().addShutdownHook(new Thread(globalExecutor::shutdown));
         NetworkManager networkManager = new NetworkManager(globalExecutor);
 
         // Base Services
@@ -45,6 +45,8 @@ public class BotApplication {
                 new MediaProcessRunner(),
                 Config.SPOTIFY_DOWNLOAD_THREADS
         );
+        LiveLogServer logServer = new LiveLogServer();
+        logServer.start(Config.WEB_PORT);
 
         // Initialize Bot & Router
         CoreBot bot = new CoreBot(Config.BOT_USERNAME, Config.BOT_TOKEN);
@@ -57,7 +59,8 @@ public class BotApplication {
                 new SpotiSyncHandler(globalExecutor, spotifyService),
                 new FolderIndexHandler(globalExecutor, nextcloudService),
                 new DockerManagerHandler(globalExecutor, dockerService),
-                new UpdateBotHandler(globalExecutor, systemService)
+                new UpdateBotHandler(globalExecutor, systemService),
+                new SysLogsHandler(globalExecutor)
         ));
         handlers.add(new HelpHandler(handlers));
         handlers.forEach(router::registerCommand);
@@ -70,9 +73,20 @@ public class BotApplication {
         // Start API Polling
         new TelegramBotsApi(DefaultBotSession.class).registerBot(bot);
         setupNativeMenu(bot, handlers);
-
-        bot.sendMessage(Config.AUTHORIZED_CHAT_ID, "  <b>System Boot</b>\nDaemon online.");
+        bot.sendMessage(Config.AUTHORIZED_CHAT_ID,
+                "<b>System Boot</b>" +
+                        "\nDaemon online."
+        );
         log.info("Telegram Bot API successfully registered and running.");
+
+        // Unified Graceful Teardown
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.info("Initiating global shutdown sequence...");
+            logServer.stop();
+            scheduler.shutdown();
+            spotifyService.shutdown();
+            globalExecutor.shutdownNow();
+        }));
     }
 
     private static void setupNativeMenu(CoreBot bot, List<CommandHandler> handlers) {

@@ -16,7 +16,6 @@ public class TaskScheduler {
     public TaskScheduler(MessageSender bot) {
         this.bot = bot;
         this.executor = Executors.newScheduledThreadPool(2);
-        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
     public void schedule(BotTask task) {
@@ -49,7 +48,7 @@ public class TaskScheduler {
         );
     }
 
-    private void shutdown() {
+    public void shutdown() {
         log.info("Shutting down TaskScheduler gracefully...");
         executor.shutdownNow();
     }
