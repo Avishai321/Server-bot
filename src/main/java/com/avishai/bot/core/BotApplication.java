@@ -20,6 +20,7 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -92,6 +93,9 @@ public class BotApplication {
     private static void setupNativeMenu(CoreBot bot, List<CommandHandler> handlers) {
         List<BotCommand> commands = handlers.stream()
                 .filter(h -> h.getDescription() != null && !h.getDescription().isBlank())
+                .sorted(Comparator
+                        .comparing(CommandHandler::getCategory)
+                        .thenComparing(h -> h.getCommandSignature().get(0)))
                 .map(h -> new BotCommand(
                         h.getCommandSignature().get(0),
                         h.getDescription()
