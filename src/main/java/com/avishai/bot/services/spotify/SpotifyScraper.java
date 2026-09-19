@@ -19,10 +19,12 @@ import static java.util.Base64.getDecoder;
 public class SpotifyScraper {
     private static final Pattern PLAYLIST_ID_PATTERN =
             Pattern.compile("playlist/([a-zA-Z0-9]+)");
-    private static final Pattern NEXT_DATA_PATTERN =
-            Pattern.compile("<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>");
-    private static final Pattern INITIAL_STATE_PATTERN =
-            Pattern.compile("<script id=\"initial-state\" type=\"text/plain\">(.*?)</script>");
+    private static final Pattern NEXT_DATA_PATTERN = Pattern.compile(
+            "<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>",
+            Pattern.DOTALL);
+    private static final Pattern INITIAL_STATE_PATTERN = Pattern.compile(
+            "<script id=\"initial-state\" type=\"text/plain\">(.*?)</script>",
+            Pattern.DOTALL);
 
     private final NetworkManager network;
 
@@ -89,19 +91,26 @@ public class SpotifyScraper {
                     && "track".equals(node.get("type").asText())
                     && node.has("name")
                     && node.has("artists");
+
             boolean isEmbedTrack = node.has("title")
                     && node.has("subtitle")
                     && node.has("uri")
                     && node.get("uri").asText().contains("track");
 
+            boolean isNewEntityTrack = node.has("entityType")
+                    && "track".equals(node.get("entityType").asText())
+                    && node.has("title")
+                    && node.has("subtitle");
+
             if (isStandardTrack) {
                 tracks.add(parseStandardTrack(node));
                 return;
-            } else if (isEmbedTrack) {
+            } else if (isEmbedTrack || isNewEntityTrack) {
                 tracks.add(parseEmbedTrack(node));
                 return;
             }
         }
+
         if (node.isObject() || node.isArray()) {
             node.elements().forEachRemaining(
                     child -> findTracksRecursively(child, tracks)
