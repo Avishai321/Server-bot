@@ -93,7 +93,14 @@ public class SpotifyService {
                 state.setCurrentPlaylistNum(i + 1);
                 state.getCurrentTrackName().set("Fetching metadata from HTML...");
                 broadcastState(state, onStateUpdate, true);
-                processPlaylist(target, state, onStateUpdate);
+
+                try {
+                    processPlaylist(target, state, onStateUpdate);
+                } catch (Exception e) {
+                    log.error("Failed to process playlist: {}", target.folderName());
+                    state.getCurrentTrackName().set("Failed: " + e.getMessage());
+                    broadcastState(state, onStateUpdate, true);
+                }
             }
             if (abortFlag.get()) {
                 state.getGlobalStatus().set("Aborted");
@@ -126,8 +133,12 @@ public class SpotifyService {
                 .toList();
 
         log.info("[{}] Extracted {} unique tracks.", target.folderName(), uniqueTracks.size());
+
         if (uniqueTracks.isEmpty()) {
-            throw new IllegalStateException("Parser found 0 tracks. Link may be broken.");
+            log.warn("[{}] Parser found 0 tracks. Skipping.", target.folderName());
+            state.getCurrentTrackName().set("0 tracks found. Skipping...");
+            broadcastState(state, onUiUpdate, true);
+            return;
         }
 
         Path targetDir = Paths.get(Config.MUSIC_STORAGE_ROOT, target.folderName());
