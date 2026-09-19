@@ -3,6 +3,7 @@ package com.avishai.bot.handlers;
 import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.routing.CommandContext;
 import com.avishai.bot.services.SystemService;
+import com.avishai.bot.util.TelegramUi;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
@@ -31,25 +32,24 @@ public class UpdateBotHandler implements CommandHandler {
     @Override
     public void handle(CommandContext ctx) {
         Integer msgId = ctx.reply("""
-                🛠️ <b>System Update</b>
-                Status: <i>Compiling new source code with Maven...</i>""");
+                <b>SYSTEM UPDATE</b>
+                <b>Status:</b> <i>Compiling new source code with Maven...</i>""");
 
         executorService.submit(() -> {
             var response = systemService.pullAndRecompile();
-
             if (response.isSuccess()) {
                 ctx.edit(msgId, """
-                        🛠️ <b>System Update</b>
-                        Status: Compilation Successful! ✅
+                        <b>SYSTEM UPDATE</b>
+                        <b>Status:</b> Compilation Successful!
                         
-                        <i>Restarting daemon... Be back in 3 seconds.</i>""");
+                        <i>Restarting daemon...</i>""");
                 systemService.restartDaemon();
             } else {
                 ctx.edit(msgId, String.format("""
-                        ⚠️ <b>System Update</b>
-                        Status: Compilation Failed ❌
+                        <b>SYSTEM UPDATE</b>
+                        <b>Status:</b> Compilation Failed
                         
-                        <pre>%s</pre>""", response.error()));
+                        <pre>%s</pre>""", TelegramUi.escapeHtml(response.error())));
             }
         });
     }

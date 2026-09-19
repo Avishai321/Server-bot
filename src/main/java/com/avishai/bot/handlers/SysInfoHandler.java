@@ -33,21 +33,17 @@ public class SysInfoHandler implements CommandHandler {
 
     @Override
     public void handle(CommandContext ctx) {
-        Integer msgId = ctx.reply("🔍 <i>Gathering hardware telemetry...</i>");
+        Integer msgId = ctx.reply("<i>Gathering hardware telemetry...</i>");
 
         CompletableFuture.runAsync(() -> {
             String uiCard = String.format("""
-                                 🖥️ <b>Server Health Dashboard</b>
-                                \s
-                                 ⏱️ <b>Uptime:</b> <code>%s</code>
-                                \s
-                                 🧠 <b>Memory (RAM):</b>\s
-                                 <code>%s</code>
-                                \s
-                                 💾 <b>Storage (Root):</b>\s
-                                 <code>%s</code>
-                                \s
-                                 <i>✅ All systems operational</i>""",
+                            <b>SERVER HEALTH DASHBOARD</b>
+                            
+                            <b>Uptime:</b> <code>%s</code>
+                            <b>Memory (RAM):</b> <code>%s</code>
+                            <b>Storage (Root):</b> <code>%s</code>
+                            
+                            <i>All systems operational.</i>""",
                     systemService.getUptime(),
                     systemService.getRamUsage(),
                     systemService.getDiskUsage()

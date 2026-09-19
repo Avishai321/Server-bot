@@ -2,8 +2,8 @@ package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.routing.CommandContext;
-import com.avishai.bot.util.TelegramUi;
 import com.avishai.bot.services.spotify.SpotifyService;
+import com.avishai.bot.util.TelegramUi;
 import lombok.RequiredArgsConstructor;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 
@@ -33,7 +33,7 @@ public class SpotiSyncHandler implements CommandHandler {
     @Override
     public String getDetailedHelp() {
         return """
-                🎵 <b>Spotify Sync - Manual</b>
+                <b>Spotify Sync - Manual</b>
                 
                 Executes SpotDL via system shell and updates Nextcloud database.
                 
@@ -52,18 +52,19 @@ public class SpotiSyncHandler implements CommandHandler {
     private void triggerSync(CommandContext ctx) {
         if (spotifyService.isBusy()) {
             ctx.reply(String.format(
-                    "⚠️ A sync is already in progress!\nType %s to terminate it.",
+                    "<b>Action Denied:</b> A sync is already in progress!" +
+                            "\nType %s to terminate it.",
                     BotCommands.STOP_SPOTIFY_BACKUP));
             return;
         }
 
         Integer messageId = ctx.reply("""
-                        🎵 <b>TASK:</b> Spotify Music Sync
+                        <b>TASK:</b> Spotify Music Sync
+                        <b>STATUS:</b> Initializing...
                         
-                        🚀 <b>STATUS:</b> Initializing...
-                        🎧 <b>Track:</b> <i>Connecting...</i>""",
+                        <b>TRACK:</b> <i>Connecting...</i>""",
                 TelegramUi.singleButtonKeyboard(
-                        "🛑 Abort",
+                        "Abort",
                         BotCommands.STOP_SPOTIFY_BACKUP)
         );
 
@@ -71,7 +72,7 @@ public class SpotiSyncHandler implements CommandHandler {
             executorService.submit(() -> spotifyService.runSync(state -> {
                 InlineKeyboardMarkup keyboard = state.isActive()
                         ? TelegramUi.singleButtonKeyboard(
-                        "🛑 Abort", BotCommands.STOP_SPOTIFY_BACKUP)
+                        "Abort", BotCommands.STOP_SPOTIFY_BACKUP)
                         : null;
 
                 ctx.edit(messageId, state.renderCard(), keyboard);
@@ -82,8 +83,8 @@ public class SpotiSyncHandler implements CommandHandler {
     private void abortSync(CommandContext ctx) {
         if (spotifyService.isBusy()) {
             spotifyService.abortSync();
-            ctx.reply("🛑 <b>Abort Signal Sent!</b>" +
+            ctx.reply("<b>Abort Signal Sent!</b>" +
                     "\nThe sync process is being forcibly terminated.");
-        } else ctx.reply("ℹ️ No sync process is currently running.");
+        } else ctx.reply("No sync process is currently running.");
     }
 }

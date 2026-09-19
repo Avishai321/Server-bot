@@ -50,8 +50,8 @@ public class SpotiSyncState {
                 : 0;
 
         String playlistInfo = (totalPlaylists > 0) ? String.format("""
-                        <b>Playlist:</b> <code>%s</code> (%d/%d)
-                        <b>Progress:</b> <code>%s</code> %d / %d
+                        <b>PLAYLIST:</b> <code>%s</code> (%d/%d)
+                        <b>PROGRESS:</b> <code>%s</code> %d/%d
                         """,
                 TelegramUi.escapeHtml(currentPlaylistName),
                 currentPlaylistNum,
@@ -62,11 +62,11 @@ public class SpotiSyncState {
 
         return String.format("""
                         <b>TASK:</b> Spotify Music Sync
-                         \s
                         <b>STATUS:</b> %s
-                        %s<b>Track:</b> <i>%s</i>
-                         \s
-                         Downloaded: %d  | Skipped: %d  | Failed: %d""",
+                        
+                        %s<b>TRACK:</b> <i>%s</i>
+                        
+                        Downloaded: %d | Skipped: %d | Failed: %d""",
                 globalStatus.get(),
                 playlistInfo,
                 TelegramUi.escapeHtml(currentTrackName.get()),

@@ -2,8 +2,8 @@ package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.routing.CommandContext;
-import com.avishai.bot.util.TelegramUi;
 import com.avishai.bot.services.NextcloudService;
+import com.avishai.bot.util.TelegramUi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -64,11 +64,9 @@ public class FolderIndexHandler implements CommandHandler {
         }
     }
 
-    private void sendDirectoryMenu(
-            CommandContext ctx,
-            Path currentDir,
-            Integer messageId
-    ) {
+    private void sendDirectoryMenu(CommandContext ctx,
+                                   Path currentDir,
+                                   Integer messageId) {
         Path validDir = (Files.exists(currentDir) && Files.isDirectory(currentDir))
                 ? currentDir
                 : ROOT_PATH;
@@ -88,7 +86,6 @@ public class FolderIndexHandler implements CommandHandler {
             rows.add(List.of(indexButton, upButton));
         } else rows.add(List.of(indexButton));
 
-
         try (Stream<Path> paths = Files.list(validDir)) {
             List<Path> subDirs = paths
                     .filter(Files::isDirectory)
@@ -100,7 +97,7 @@ public class FolderIndexHandler implements CommandHandler {
                     subDirs,
                     2,
                     dir -> TelegramUi.button(
-                            "📁 " + dir.getFileName(),
+                            dir.getFileName().toString(),
                             "/idx_nav " + registerPath(dir)
                     ))
             );
@@ -112,7 +109,7 @@ public class FolderIndexHandler implements CommandHandler {
         markup.setKeyboard(rows);
 
         String text = String.format("""
-                📂 <b>Server Index Explorer</b>
+                <b>Server Index Explorer</b>
                 <b>Location:</b> <code>%s</code>
                 
                 Navigate or execute sync:""", validDir.toAbsolutePath());
@@ -123,35 +120,31 @@ public class FolderIndexHandler implements CommandHandler {
 
     private void startIndexingProcess(CommandContext ctx, Path targetPath, Integer messageId) {
         if (nextcloudService.isBusy()) {
-            ctx.edit(messageId,
-                    "⚠️ <b>Action Denied:</b> " +
-                            "Another indexing task is currently running.");
+            ctx.edit(messageId, "<b>Action Denied:</b> Another indexing task is currently running.");
             return;
         }
 
         long startTime = System.currentTimeMillis();
+
         ctx.edit(messageId, String.format("""
-                        ⚙️ <b>Nextcloud Indexing Started...</b>
+                        <b>Nextcloud Indexing Started...</b>
                         <b>Target:</b> <code>%s</code>""", targetPath.toAbsolutePath()),
-                TelegramUi.singleButtonKeyboard(
-                        "🛑 Stop Indexing",
-                        "/idx_stop")
+                TelegramUi.singleButtonKeyboard("Stop Indexing", "/idx_stop")
         );
 
         NextcloudService.NextcloudSyncResult result;
+
         try (ScheduledExecutorService uiScheduler = Executors.newSingleThreadScheduledExecutor()) {
             uiScheduler.scheduleAtFixedRate(() -> {
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
                 ctx.edit(messageId, String.format("""
-                                        ⚙️ <b>Syncing Nextcloud Database...</b>
+                                        <b>Syncing Nextcloud Database...</b>
                                         <b>Target:</b> <code>%s</code>
                                         
-                                        ⏱ <b>Elapsed Time:</b> %ds
+                                        <b>Elapsed Time:</b> %ds
                                         <i>Scanning files in background...</i>""",
                                 targetPath.toAbsolutePath(), elapsed),
-                        TelegramUi.singleButtonKeyboard(
-                                "🛑 Stop Indexing",
-                                "/idx_stop")
+                        TelegramUi.singleButtonKeyboard("Stop Indexing", "/idx_stop")
                 );
             }, 1, 1, TimeUnit.SECONDS);
 
@@ -163,6 +156,7 @@ public class FolderIndexHandler implements CommandHandler {
                 return;
             }
         }
+
         renderFinalState(ctx, messageId, targetPath, result);
     }
 
@@ -174,7 +168,7 @@ public class FolderIndexHandler implements CommandHandler {
     ) {
         if (result.output().contains("Another process is already scanning")) {
             ctx.edit(messageId, String.format("""
-                              <b>Server Busy</b>
+                            <b>Server Busy</b>
                             <b>Target:</b> <code>%s</code>
                             
                             Nextcloud is currently indexing this folder in the background.

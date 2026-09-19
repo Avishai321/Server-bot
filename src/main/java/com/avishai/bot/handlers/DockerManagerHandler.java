@@ -2,8 +2,8 @@ package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
 import com.avishai.bot.routing.CommandContext;
-import com.avishai.bot.util.TelegramUi;
 import com.avishai.bot.services.DockerService;
+import com.avishai.bot.util.TelegramUi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -89,20 +89,18 @@ public class DockerManagerHandler implements CommandHandler {
                 .toList();
 
         if (containers.isEmpty()) {
-            ctx.reply("❌ Failed to fetch containers from Docker engine.");
+            ctx.reply("Failed to fetch containers from Docker engine.");
             return;
         }
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(TelegramUi.createGrid(
-                        containers,
-                        2,
-                        name -> TelegramUi.button("📦 " + name,
-                                "/docker menu " + name)
-                )
-        );
+                containers,
+                2,
+                name -> TelegramUi.button(name, "/docker menu " + name)
+        ));
 
-        String text = "🐳 <b>Docker Management</b>\n\nSelect a container to manage:";
+        String text = "<b>Docker Management</b>\nSelect a container to manage:";
         if (messageId != null) ctx.edit(messageId, text, markup);
         else ctx.reply(text, markup);
     }
@@ -117,15 +115,15 @@ public class DockerManagerHandler implements CommandHandler {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(List.of(
                 List.of(
-                        TelegramUi.button("🔄 Restart", "/docker restart " + name),
-                        TelegramUi.button("📄 Logs", "/docker logs " + name)
+                        TelegramUi.button("Restart", "/docker restart " + name),
+                        TelegramUi.button("Logs", "/docker logs " + name)
                 ),
-                List.of(TelegramUi.button("🔙 Back to List", BotCommands.DOCKER_MANAGER))
+                List.of(TelegramUi.button("Back to List", BotCommands.DOCKER_MANAGER))
         ));
 
         String text = String.format("""
-                📦 <b>Container:</b> <code>%s</code>
-                📊 <b>Status:</b> %s""", name, status);
+                <b>CONTAINER:</b> <code>%s</code>
+                <b>STATUS:</b> %s""", name, status);
 
         if (messageId != null) ctx.edit(messageId, text, markup);
         else ctx.reply(text, markup);

@@ -62,11 +62,11 @@ public class UpdateRouter {
                     );
 
                     String errorUi = String.format("""
-                            ❌ <b>System Fault</b>
+                            <b>SYSTEM FAULT</b>
                             An unexpected internal error occurred.
                             
-                            <b>Trace:</b> <pre>%s</pre>""", TelegramUi.escapeHtml(e.getMessage()));
-
+                            <b>Trace:</b>
+                            <pre>%s</pre>""", TelegramUi.escapeHtml(e.getMessage()));
                     messageSender.sendMessage(chatIdStr, errorUi);
                 }
             } else handleUnknownCommand(chatIdStr, messageSender);
@@ -75,7 +75,7 @@ public class UpdateRouter {
 
     public void handleUnknownCommand(String chatId, MessageSender messageSender) {
         messageSender.sendMessage(chatId,
-                "⚠️ <b>Unknown Command</b>\n" +
+                "<b>Unknown Command</b>\n" +
                         "I don't recognize that instruction. " +
                         "Type /help to see the available modules.");
     }
