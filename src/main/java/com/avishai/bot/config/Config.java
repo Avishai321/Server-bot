@@ -16,6 +16,7 @@ public class Config {
     public static final String CONFIG_DIR = System.getenv().getOrDefault("CONFIG_DIR", ".");
     public static final String PLAYLIST_FILE_PATH = Paths.get(CONFIG_DIR, "playlists.json").toString();
 
+    public static final int GLOBAL_EXECUTOR_THREADS = 10;
     public static final long TELEGRAM_UPDATE_INTERVAL_MS = 2000;
     public static final int SPOTIFY_DOWNLOAD_THREADS = 4;
 }

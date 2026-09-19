@@ -29,15 +29,13 @@ public class BotApplication {
         validateEnvironment();
 
         // Core Infrastructure
-        ExecutorService globalExecutor = Executors.newCachedThreadPool();
+        ExecutorService globalExecutor = Executors.newFixedThreadPool(Config.GLOBAL_EXECUTOR_THREADS);
         NetworkManager networkManager = new NetworkManager(globalExecutor);
 
         // Base Services
         NextcloudService nextcloudService = new NextcloudService();
         SystemService systemService = new SystemService();
         DockerService dockerService = new DockerService();
-
-        // Spotify
         SpotifyService spotifyService = new SpotifyService(
                 nextcloudService,
                 new SpotifyScraper(networkManager),
