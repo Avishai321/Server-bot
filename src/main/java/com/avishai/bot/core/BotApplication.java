@@ -30,6 +30,7 @@ public class BotApplication {
 
         // Core Infrastructure
         ExecutorService globalExecutor = Executors.newFixedThreadPool(Config.GLOBAL_EXECUTOR_THREADS);
+        Runtime.getRuntime().addShutdownHook(new Thread(globalExecutor::shutdown));
         NetworkManager networkManager = new NetworkManager(globalExecutor);
 
         // Base Services

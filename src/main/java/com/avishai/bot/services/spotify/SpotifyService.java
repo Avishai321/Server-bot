@@ -46,9 +46,12 @@ public class SpotifyService {
         this.itunesClient = itunesClient;
         this.lrcLibClient = lrcLibClient;
         this.processRunner = processRunner;
-        this.downloadPool = Executors.newFixedThreadPool(threadCount);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(this::abortSync));
+        this.downloadPool = Executors.newFixedThreadPool(threadCount);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            abortSync();
+            this.downloadPool.shutdownNow();
+        }));
     }
 
     public boolean isBusy() {
