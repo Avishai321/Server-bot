@@ -1,6 +1,7 @@
 package com.avishai.bot.services.spotify;
 
 import com.avishai.bot.config.Config;
+import com.avishai.bot.core.ManagedService;
 import com.avishai.bot.models.spotify.SpotiSyncState;
 import com.avishai.bot.models.spotify.SpotifyResponses;
 import com.avishai.bot.services.NextcloudService;
@@ -23,7 +24,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
-public class SpotifyService {
+public class SpotifyService implements ManagedService {
     private final NextcloudService nextcloudService;
     private final SpotifyScraper scraper;
     private final ItunesClient itunesClient;
@@ -346,6 +347,7 @@ public class SpotifyService {
         }
     }
 
+    @Override
     public void shutdown() {
         abortSync();
         if (downloadPool != null && !downloadPool.isShutdown()) {

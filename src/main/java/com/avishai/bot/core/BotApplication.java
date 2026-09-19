@@ -20,6 +20,7 @@ import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScope
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +31,9 @@ public class BotApplication {
     public static void start() throws Exception {
         validateEnvironment();
 
+        // Registry for all managed background services
+        List<ManagedService> managedServices = new ArrayList<>();
+
         // Core Infrastructure
         ExecutorService globalExecutor = Executors.newFixedThreadPool(Config.GLOBAL_EXECUTOR_THREADS);
         NetworkManager networkManager = new NetworkManager(globalExecutor);
@@ -38,6 +42,7 @@ public class BotApplication {
         NextcloudService nextcloudService = new NextcloudService();
         SystemService systemService = new SystemService();
         DockerService dockerService = new DockerService();
+
         SpotifyService spotifyService = new SpotifyService(
                 nextcloudService,
                 new SpotifyScraper(networkManager),
@@ -46,8 +51,11 @@ public class BotApplication {
                 new MediaProcessRunner(),
                 Config.SPOTIFY_DOWNLOAD_THREADS
         );
+        managedServices.add(spotifyService);
+
         LiveLogServer logServer = new LiveLogServer();
         logServer.start(Config.WEB_PORT);
+        managedServices.add(logServer);
 
         // Initialize Bot & Router
         CoreBot bot = new CoreBot(Config.BOT_USERNAME, Config.BOT_TOKEN);
@@ -70,6 +78,7 @@ public class BotApplication {
         TaskScheduler scheduler = new TaskScheduler(bot);
         scheduler.schedule(new NextcloudIndexTask(nextcloudService, bot));
         scheduler.schedule(new SpotiSyncTask(spotifyService, bot));
+        managedServices.add(scheduler);
 
         // Start API Polling
         new TelegramBotsApi(DefaultBotSession.class).registerBot(bot);
@@ -83,10 +92,19 @@ public class BotApplication {
         // Unified Graceful Teardown
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.info("Initiating global shutdown sequence...");
-            logServer.stop();
-            scheduler.shutdown();
-            spotifyService.shutdown();
+
+            // Reverse iteration ensures dependent services (like the scheduler)
+            // shut down before base services (like SpotifyService)
+            for (int i = managedServices.size() - 1; i >= 0; i--) {
+                try {
+                    managedServices.get(i).shutdown();
+                } catch (Exception e) {
+                    log.error("Non-fatal error during service teardown");
+                }
+            }
+
             globalExecutor.shutdownNow();
+            log.info("Daemon securely terminated.");
         }));
     }
 

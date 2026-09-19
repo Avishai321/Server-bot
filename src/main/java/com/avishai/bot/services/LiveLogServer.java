@@ -1,5 +1,6 @@
 package com.avishai.bot.services;
 
+import com.avishai.bot.core.ManagedService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -16,7 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Slf4j
-public class LiveLogServer {
+public class LiveLogServer implements ManagedService {
     private HttpServer server;
     private ExecutorService httpThreadPool;
 
@@ -36,7 +37,8 @@ public class LiveLogServer {
         }
     }
 
-    public void stop() {
+    @Override
+    public void shutdown() {
         if (server != null) {
             server.stop(0);
             log.info("Live HTTP log server stopped.");

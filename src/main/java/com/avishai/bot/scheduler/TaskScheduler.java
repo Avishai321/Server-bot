@@ -1,6 +1,7 @@
 package com.avishai.bot.scheduler;
 
 import com.avishai.bot.config.Config;
+import com.avishai.bot.core.ManagedService;
 import com.avishai.bot.routing.MessageSender;
 import lombok.extern.slf4j.Slf4j;
 
@@ -9,7 +10,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 
 @Slf4j
-public class TaskScheduler {
+public class TaskScheduler implements ManagedService {
     private final ScheduledExecutorService executor;
     private final MessageSender bot;
 
@@ -48,6 +49,7 @@ public class TaskScheduler {
         );
     }
 
+    @Override
     public void shutdown() {
         log.info("Shutting down TaskScheduler gracefully...");
         executor.shutdownNow();
