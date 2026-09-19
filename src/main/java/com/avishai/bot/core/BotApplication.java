@@ -52,15 +52,14 @@ public class BotApplication {
         bot.setUpdateRouter(router);
 
         // Register Handlers
-        List<CommandHandler> handlers = List.of(
+        List<CommandHandler> handlers = new java.util.ArrayList<>(List.of(
                 new SysInfoHandler(globalExecutor, systemService),
                 new SpotiSyncHandler(globalExecutor, spotifyService),
                 new FolderIndexHandler(globalExecutor, nextcloudService),
                 new DockerManagerHandler(globalExecutor, dockerService),
                 new UpdateBotHandler(globalExecutor, systemService)
-        );
-
-        router.registerCommand(new HelpHandler(handlers));
+        ));
+        handlers.add(new HelpHandler(handlers));
         handlers.forEach(router::registerCommand);
 
         // Initialize Scheduling
