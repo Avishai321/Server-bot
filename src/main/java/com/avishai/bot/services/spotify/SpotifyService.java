@@ -119,7 +119,6 @@ public class SpotifyService {
     private void processPlaylist(PlaylistManager.SpotifyTarget target,
                                  SpotiSyncState state,
                                  Consumer<SpotiSyncState> onUiUpdate) throws Exception {
-
         List<SpotifyResponses.Track> uniqueTracks = scraper
                 .extractTracks(target.link(), target.folderName())
                 .stream()
@@ -144,8 +143,10 @@ public class SpotifyService {
         log.info("[{}] Folder holds {} files. {} missing tracks queued.",
                 target.folderName(), existingFiles.size(), missingTracks.size());
 
-        state.setTracksInCurrentPlaylist(missingTracks.size());
-        state.addSkipped(uniqueTracks.size() - missingTracks.size());
+        int skippedCount = uniqueTracks.size() - missingTracks.size();
+        state.setTracksInCurrentPlaylist(uniqueTracks.size());
+        state.getTracksProcessedInCurrent().set(skippedCount);
+        state.addSkipped(skippedCount);
         broadcastState(state, onUiUpdate, true);
 
         List<CompletableFuture<Void>> tasks = missingTracks.stream()
