@@ -88,8 +88,7 @@ public class BotApplication {
         new TelegramBotsApi(DefaultBotSession.class).registerBot(bot);
         setupNativeMenu(bot, handlers);
         bot.sendMessage(Config.AUTHORIZED_CHAT_ID,
-                "<b>System Boot</b>" +
-                        "\nDaemon online."
+                "<b>System Boot</b>\nDaemon online."
         );
         log.info("Telegram Bot API successfully registered and running.");
 
@@ -113,14 +112,17 @@ public class BotApplication {
     }
 
     private static void setupNativeMenu(CoreBot bot, List<CommandHandler> handlers) {
+        Class<com.avishai.bot.routing.BotCommand> botAnn = com.avishai.bot.routing.BotCommand.class;
+
         List<BotCommand> commands = handlers.stream()
-                .filter(h -> h.getDescription() != null && !h.getDescription().isBlank())
-                .sorted(Comparator
-                        .comparing(CommandHandler::getCategory)
-                        .thenComparing(h -> h.getCommandSignature().getFirst()))
-                .map(h -> new BotCommand(
-                        h.getCommandSignature().getFirst(),
-                        h.getDescription()
+                .filter(h -> h.getClass().isAnnotationPresent(botAnn))
+                .map(h -> h.getClass().getAnnotation(botAnn))
+                .filter(ann -> !ann.description().isBlank())
+                .sorted(Comparator.comparing(com.avishai.bot.routing.BotCommand::category)
+                        .thenComparing(ann -> ann.command()[0]))
+                .map(ann -> new BotCommand(
+                        ann.command()[0],
+                        ann.description()
                 ))
                 .toList();
 

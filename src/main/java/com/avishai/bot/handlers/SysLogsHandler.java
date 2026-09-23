@@ -1,6 +1,7 @@
 package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.Config;
+import com.avishai.bot.routing.BotCommand;
 import com.avishai.bot.routing.CommandContext;
 import com.avishai.bot.util.ShellUtil;
 import com.avishai.bot.util.TelegramUi;
@@ -13,36 +14,17 @@ import java.util.concurrent.ExecutorService;
 
 @Slf4j
 @RequiredArgsConstructor
+@BotCommand(
+        command = {"/syslogs"},
+        category = HandlerCategory.MONITORING_AND_ADMIN,
+        description = "Fetch bot journalctl logs",
+        detailedHelp = "Fetch background journalctl logs for the bot daemon." +
+                "\nUse 'live' argument for a secure streaming web link.",
+        arguments = {"[lines]", "live [lines]"},
+        examples = {"/syslogs", "/syslogs 100", "/syslogs live", "/syslogs live 200"}
+)
 public class SysLogsHandler implements CommandHandler {
     private final ExecutorService executorService;
-
-    @Override
-    public List<String> getCommandSignature() {
-        return List.of("/syslogs");
-    }
-
-    @Override
-    public HandlerCategory getCategory() {
-        return HandlerCategory.MONITORING_AND_ADMIN;
-    }
-
-    @Override
-    public String getDescription() {
-        return "Fetch bot journalctl logs";
-    }
-
-    @Override
-    public String getDetailedHelp() {
-        return """
-                <b>System Logs Help</b>
-                Fetch background journalctl logs for the bot daemon.
-                
-                <b>Commands:</b>
-                <code>/syslogs [lines]</code> - Receive a static text output.
-                <code>/syslogs live [lines]</code> - Secure web link for real-time streaming.
-                
-                <i>Default lines: 20 static, 50 live.</i>""";
-    }
 
     @Override
     public void handle(CommandContext ctx) {
@@ -99,8 +81,7 @@ public class SysLogsHandler implements CommandHandler {
         }
 
         ctx.edit(msgId, String.format(
-                "<b>SYSTEM LOGS</b> (Last %d lines):" +
-                        "\n<pre>%s</pre>",
+                "<b>SYSTEM LOGS</b> (Last %d lines):\n<pre>%s</pre>",
                 lines, TelegramUi.escapeHtml(logs))
         );
     }

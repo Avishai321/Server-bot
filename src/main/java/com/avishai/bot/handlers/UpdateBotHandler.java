@@ -1,33 +1,25 @@
 package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.routing.BotCommand;
 import com.avishai.bot.routing.CommandContext;
 import com.avishai.bot.services.SystemService;
 import com.avishai.bot.util.TelegramUi;
 import lombok.RequiredArgsConstructor;
 
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 @RequiredArgsConstructor
+@BotCommand(
+        command = {BotCommands.UPDATE_BOT},
+        category = HandlerCategory.MONITORING_AND_ADMIN,
+        description = "Recompile and restart bot",
+        detailedHelp = "Pulls the latest code from git, recompiles via Maven, and restarts the daemon.",
+        examples = {"/update"}
+)
 public class UpdateBotHandler implements CommandHandler {
     private final ExecutorService executorService;
     private final SystemService systemService;
-
-    @Override
-    public List<String> getCommandSignature() {
-        return List.of(BotCommands.UPDATE_BOT);
-    }
-
-    @Override
-    public HandlerCategory getCategory() {
-        return HandlerCategory.MONITORING_AND_ADMIN;
-    }
-
-    @Override
-    public String getDescription() {
-        return "Recompile and restart bot";
-    }
 
     @Override
     public void handle(CommandContext ctx) {

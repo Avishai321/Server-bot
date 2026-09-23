@@ -1,6 +1,7 @@
 package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.routing.BotCommand;
 import com.avishai.bot.routing.CommandContext;
 import com.avishai.bot.services.NextcloudService;
 import com.avishai.bot.util.TelegramUi;
@@ -23,27 +24,19 @@ import java.util.stream.Stream;
 
 @Slf4j
 @RequiredArgsConstructor
+@BotCommand(
+        command = {BotCommands.INDEX_FOLDER, "/idx_nav", "/idx_run", "/idx_stop"},
+        category = HandlerCategory.STORAGE_AND_MEDIA,
+        description = "Index specific server directories",
+        detailedHelp = "Navigate and select server directories to run Nextcloud OCC scan on.",
+        examples = {"/index"}
+)
 public class FolderIndexHandler implements CommandHandler {
     private static final Path ROOT_PATH = Paths.get(NextcloudService.ROOT_PATH_STR);
     private static final Path BOUNDARY_PATH = Paths.get("/mnt/d");
     private final ExecutorService executorService;
     private final NextcloudService nextcloudService;
     private final Map<String, Path> pathCache = new ConcurrentHashMap<>();
-
-    @Override
-    public List<String> getCommandSignature() {
-        return List.of(BotCommands.INDEX_FOLDER, "/idx_nav", "/idx_run", "/idx_stop");
-    }
-
-    @Override
-    public HandlerCategory getCategory() {
-        return HandlerCategory.STORAGE_AND_MEDIA;
-    }
-
-    @Override
-    public String getDescription() {
-        return "Index specific server directories";
-    }
 
     @Override
     public void handle(CommandContext ctx) {

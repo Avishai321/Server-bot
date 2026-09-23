@@ -1,6 +1,7 @@
 package com.avishai.bot.handlers;
 
 import com.avishai.bot.config.BotCommands;
+import com.avishai.bot.routing.BotCommand;
 import com.avishai.bot.routing.CommandContext;
 import com.avishai.bot.services.DockerService;
 import com.avishai.bot.util.TelegramUi;
@@ -16,43 +17,17 @@ import java.util.concurrent.ExecutorService;
 
 @Slf4j
 @RequiredArgsConstructor
+@BotCommand(
+        command = {BotCommands.DOCKER_MANAGER},
+        category = HandlerCategory.INFRASTRUCTURE,
+        description = "Manage Docker containers",
+        detailedHelp = "Manage your server's Docker containers via interactive menus or direct commands.",
+        arguments = {"[name]", "[lines]", "[format]"},
+        examples = {"/docker menu [name]", "/docker restart [name]", "/docker logs [name] [lines] [format]"}
+)
 public class DockerManagerHandler implements CommandHandler {
     private final ExecutorService executorService;
     private final DockerService dockerService;
-
-    @Override
-    public List<String> getCommandSignature() {
-        return List.of(BotCommands.DOCKER_MANAGER);
-    }
-
-    @Override
-    public HandlerCategory getCategory() {
-        return HandlerCategory.INFRASTRUCTURE;
-    }
-
-    @Override
-    public String getDescription() {
-        return "Manage Docker containers";
-    }
-
-    @Override
-    public String getDetailedHelp() {
-        return """
-                🐳 <b>Docker Manager Help</b>
-                Manage your server's Docker containers via interactive menus or direct commands.
-                
-                <b>Interactive Command:</b>
-                • <code>%s</code> - Opens the main grid of all available containers.
-                
-                <b>Direct Commands (Internal Routing):</b>
-                • <code>/docker menu &lt;name&gt;</code> - View status and actions for a specific container.
-                • <code>/docker restart &lt;name&gt;</code> - Restart a target container.
-                • <code>/docker logs &lt;name&gt; [lines] [format]</code> - Fetch container logs.
-                  <i>lines:</i> Default is 20.
-                  <i>format:</i> 'auto' (default) or 'file'.
-                    Auto sends as a text message, or .txt file if the output is too long.
-                """.formatted(BotCommands.DOCKER_MANAGER);
-    }
 
     @Override
     public void handle(CommandContext ctx) {
@@ -121,9 +96,8 @@ public class DockerManagerHandler implements CommandHandler {
                 List.of(TelegramUi.button("Back to List", BotCommands.DOCKER_MANAGER))
         ));
 
-        String text = String.format("""
-                <b>CONTAINER:</b> <code>%s</code>
-                <b>STATUS:</b> %s""", name, status);
+        String text = String.format("<b>CONTAINER:</b> <code>%s</code>" +
+                "\n<b>STATUS:</b> %s", name, status);
 
         if (messageId != null) ctx.edit(messageId, text, markup);
         else ctx.reply(text, markup);
