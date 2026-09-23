@@ -5,6 +5,7 @@ import com.avishai.bot.core.ManagedService;
 import com.avishai.bot.models.spotify.SpotiSyncState;
 import com.avishai.bot.models.spotify.SpotifyResponses;
 import com.avishai.bot.services.NextcloudService;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -13,20 +14,21 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
+@RequiredArgsConstructor
 public class SpotifyService implements ManagedService {
     private final NextcloudService nextcloudService;
-    private final SpotifyScraper scraper;
+    private final SpicetifyBridgeServer bridgeServer;
     private final ItunesClient itunesClient;
     private final LrcLibClient lrcLibClient;
     private final MediaProcessRunner processRunner;
@@ -35,20 +37,6 @@ public class SpotifyService implements ManagedService {
     private final AtomicBoolean isSyncing = new AtomicBoolean(false);
     private final AtomicBoolean abortFlag = new AtomicBoolean(false);
     private long lastUiUpdateTime = 0;
-
-    public SpotifyService(NextcloudService nextcloudService,
-                          SpotifyScraper scraper,
-                          ItunesClient itunesClient,
-                          LrcLibClient lrcLibClient,
-                          MediaProcessRunner processRunner,
-                          int threadCount) {
-        this.nextcloudService = nextcloudService;
-        this.scraper = scraper;
-        this.itunesClient = itunesClient;
-        this.lrcLibClient = lrcLibClient;
-        this.processRunner = processRunner;
-        this.downloadPool = Executors.newFixedThreadPool(threadCount);
-    }
 
     public boolean isBusy() {
         return isSyncing.get();
@@ -67,33 +55,38 @@ public class SpotifyService implements ManagedService {
         abortFlag.set(false);
         SpotiSyncState state = new SpotiSyncState();
 
-        List<PlaylistManager.SpotifyTarget> playlists = PlaylistManager.getInstance().getPlaylists();
-
-        if (playlists.isEmpty()) {
+        Map<String, List<SpotifyResponses.Track>> spicetifyData;
+        try {
+            state.getCurrentTrackName().set("Waiting for Spicetify sync...");
+            broadcastState(state, onStateUpdate, true);
+            spicetifyData = bridgeServer.waitForSync(60);
+        } catch (Exception e) {
+            log.error("Failed to sync with Spicetify", e);
             state.getGlobalStatus().set("Critical Error");
-            state.getCurrentTrackName().set("playlists.json is missing or empty.");
+            state.getCurrentTrackName().set(e.getMessage());
             state.getActive().set(false);
             broadcastState(state, onStateUpdate, true);
             isSyncing.set(false);
             return;
         }
 
-        state.setTotalPlaylists(playlists.size());
-
         try {
-            for (int i = 0; i < playlists.size(); i++) {
+            int i = 0;
+            state.setTotalPlaylists(spicetifyData.size());
+            for (Map.Entry<String, List<SpotifyResponses.Track>> entry : spicetifyData.entrySet()) {
                 if (abortFlag.get()) break;
-                PlaylistManager.SpotifyTarget target = playlists.get(i);
-                log.info("=== Starting Sync for Folder: {} ===", target.folderName());
+                String folderName = entry.getKey();
+                List<SpotifyResponses.Track> tracks = entry.getValue();
+                log.info("Starting Sync for Folder: {}", folderName);
 
-                state.setCurrentPlaylistNum(i + 1);
-                state.getCurrentTrackName().set("Fetching metadata from HTML...");
+                state.setCurrentPlaylistNum(++i);
+                state.getCurrentTrackName().set("Processing playlist...");
                 broadcastState(state, onStateUpdate, true);
 
                 try {
-                    processPlaylist(target, state, onStateUpdate);
+                    processPlaylist(folderName, tracks, state, onStateUpdate);
                 } catch (Exception e) {
-                    log.error("Failed to process playlist: {}", target.folderName());
+                    log.error("Failed to process playlist: {}", folderName);
                     state.getCurrentTrackName().set("Failed: " + e.getMessage());
                     broadcastState(state, onStateUpdate, true);
                 }
@@ -113,33 +106,35 @@ public class SpotifyService implements ManagedService {
             state.getActive().set(false);
             broadcastState(state, onStateUpdate, true);
             isSyncing.set(false);
-            if (!abortFlag.get() && "Completed".equals(state.getGlobalStatus().get())) {
-                executeNextcloudScan();
-            }
+
+            boolean needScan = !abortFlag.get()
+                    && "Completed".equals(state.getGlobalStatus().get())
+                    && spicetifyData != null;
+
+            if (needScan) executeNextcloudScan(spicetifyData.keySet());
         }
     }
 
-    private void processPlaylist(PlaylistManager.SpotifyTarget target,
+    private void processPlaylist(String folderName,
+                                 List<SpotifyResponses.Track> tracks,
                                  SpotiSyncState state,
                                  Consumer<SpotiSyncState> onUiUpdate) throws Exception {
-        List<SpotifyResponses.Track> uniqueTracks = scraper
-                .extractTracks(target.link(), target.folderName())
-                .stream()
+        List<SpotifyResponses.Track> uniqueTracks = tracks.stream()
                 .distinct()
                 .toList();
 
-        log.info("[{}] Extracted {} unique tracks.", target.folderName(), uniqueTracks.size());
+        log.info("[{}] Extracted {} unique tracks.", folderName, uniqueTracks.size());
 
         if (uniqueTracks.isEmpty()) {
-            log.warn("[{}] Parser found 0 tracks. Skipping.", target.folderName());
+            log.warn("[{}] Parser found 0 tracks. Skipping.", folderName);
             state.getCurrentTrackName().set("0 tracks found. Skipping...");
             broadcastState(state, onUiUpdate, true);
             return;
         }
 
-        Path targetDir = Paths.get(Config.MUSIC_STORAGE_ROOT, target.folderName());
+        Path targetDir = Paths.get(Config.MUSIC_STORAGE_ROOT, folderName);
         Files.createDirectories(targetDir);
-        state.setCurrentPlaylistName(target.folderName());
+        state.setCurrentPlaylistName(folderName);
         state.getTracksProcessedInCurrent().set(0);
 
         Set<String> existingFiles = getExistingFiles(targetDir);
@@ -148,7 +143,7 @@ public class SpotifyService implements ManagedService {
                 .toList();
 
         log.info("[{}] Folder holds {} files. {} missing tracks queued.",
-                target.folderName(), existingFiles.size(), missingTracks.size());
+                folderName, existingFiles.size(), missingTracks.size());
 
         int skippedCount = uniqueTracks.size() - missingTracks.size();
         state.setTracksInCurrentPlaylist(uniqueTracks.size());
@@ -163,7 +158,7 @@ public class SpotifyService implements ManagedService {
 
         try {
             CompletableFuture.allOf(tasks.toArray(new CompletableFuture[0])).join();
-            generateM3uPlaylist(targetDir, target.folderName());
+            generateM3uPlaylist(targetDir, folderName);
         } catch (CompletionException e) {
             if (abortFlag.get()) log.info("Sync interrupted via abort flag.");
             else throw e;
@@ -177,7 +172,9 @@ public class SpotifyService implements ManagedService {
         if (abortFlag.get()) return;
 
         String artist = MediaProcessRunner.cleanMetadataString(
-                track.artists().isEmpty() ? "Unknown" : track.artists().get(0).name()
+                track.artists().isEmpty() ?
+                        "Unknown"
+                        : track.artists().getFirst().name()
         );
         String title = MediaProcessRunner.cleanMetadataString(track.name());
         Path finalOutputPath = targetDir.resolve(generateSafeFileName(track) + ".m4a");
@@ -271,7 +268,7 @@ public class SpotifyService implements ManagedService {
         }
     }
 
-    private void executeNextcloudScan() {
+    private void executeNextcloudScan(Set<String> folders) {
         log.info("Spotify sync completed. Triggering automatic Nextcloud index scans...");
         try {
             var musicRootPath = Paths.get(Config.MUSIC_STORAGE_ROOT);
@@ -284,17 +281,14 @@ public class SpotifyService implements ManagedService {
             log.info("Nextcloud Music DB auto-index finished with exit code {}:\n{}",
                     musicScanResult.exitCode(), musicScanResult.output());
 
-            PlaylistManager.getInstance()
-                    .getPlaylists()
-                    .forEach(this::importNextcloudPlaylist);
+            folders.forEach(this::importNextcloudPlaylist);
 
         } catch (Exception e) {
             log.error("Failed to execute automatic Nextcloud index scans", e);
         }
     }
 
-    private void importNextcloudPlaylist(PlaylistManager.SpotifyTarget target) {
-        String folder = target.folderName();
+    private void importNextcloudPlaylist(String folder) {
         String relativeM3uPath = String.format("Music/%s/%s.m3u", folder, folder);
 
         var importResult = nextcloudService.runOccPlaylistImport(
@@ -330,7 +324,7 @@ public class SpotifyService implements ManagedService {
     private String generateSafeFileName(SpotifyResponses.Track track) {
         String artist = track.artists().isEmpty()
                 ? "Unknown"
-                : track.artists().get(0).name();
+                : track.artists().getFirst().name();
         String rawName = artist + " - " + track.name();
         return rawName.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
@@ -353,5 +347,6 @@ public class SpotifyService implements ManagedService {
         if (downloadPool != null && !downloadPool.isShutdown()) {
             downloadPool.shutdownNow();
         }
+        log.info("Spotify Service stopped.");
     }
 }

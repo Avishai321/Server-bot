@@ -43,13 +43,17 @@ public class BotApplication {
         SystemService systemService = new SystemService();
         DockerService dockerService = new DockerService();
 
+        SpicetifyBridgeServer bridgeServer = new SpicetifyBridgeServer();
+        bridgeServer.start();
+        managedServices.add(bridgeServer);
+
         SpotifyService spotifyService = new SpotifyService(
                 nextcloudService,
-                new SpotifyScraper(networkManager),
+                bridgeServer,
                 new ItunesClient(networkManager),
                 new LrcLibClient(networkManager),
                 new MediaProcessRunner(),
-                Config.SPOTIFY_DOWNLOAD_THREADS
+                Executors.newFixedThreadPool(Config.SPOTIFY_DOWNLOAD_THREADS)
         );
         managedServices.add(spotifyService);
 
@@ -113,9 +117,9 @@ public class BotApplication {
                 .filter(h -> h.getDescription() != null && !h.getDescription().isBlank())
                 .sorted(Comparator
                         .comparing(CommandHandler::getCategory)
-                        .thenComparing(h -> h.getCommandSignature().get(0)))
+                        .thenComparing(h -> h.getCommandSignature().getFirst()))
                 .map(h -> new BotCommand(
-                        h.getCommandSignature().get(0),
+                        h.getCommandSignature().getFirst(),
                         h.getDescription()
                 ))
                 .toList();

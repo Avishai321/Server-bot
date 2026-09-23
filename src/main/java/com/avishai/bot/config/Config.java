@@ -2,8 +2,6 @@ package com.avishai.bot.config;
 
 import lombok.experimental.UtilityClass;
 
-import java.nio.file.Paths;
-
 @UtilityClass
 public class Config {
     public static final String BOT_TOKEN = System.getenv("BOT_TOKEN");
@@ -13,8 +11,6 @@ public class Config {
 
     public static final String PROJECT_PATH = System.getenv("PROJECT_PATH");
     public static final String MUSIC_STORAGE_ROOT = System.getenv("MUSIC_STORAGE_ROOT");
-    public static final String CONFIG_DIR = System.getenv().getOrDefault("CONFIG_DIR", ".");
-    public static final String PLAYLIST_FILE_PATH = Paths.get(CONFIG_DIR, "playlists.json").toString();
 
     public static final String TAILSCALE_IP = System.getenv("TAILSCALE_IP");
     public static final int WEB_PORT = 8081;
