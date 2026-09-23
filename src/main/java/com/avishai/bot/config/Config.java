@@ -13,7 +13,7 @@ public class Config {
     public static final String MUSIC_STORAGE_ROOT = System.getenv("MUSIC_STORAGE_ROOT");
 
     public static final String TAILSCALE_IP = System.getenv("TAILSCALE_IP");
-    public static final int WEB_PORT = 8081;
+    public static final int WEB_PORT = 8082;
 
     public static final int GLOBAL_EXECUTOR_THREADS = 10;
     public static final long TELEGRAM_UPDATE_INTERVAL_MS = 2000;
